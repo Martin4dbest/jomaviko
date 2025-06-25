@@ -9,6 +9,9 @@ from google.oauth2.service_account import Credentials
 from datetime import datetime
 import os
 import json
+from sqlalchemy import create_engine
+from sqlalchemy.orm import scoped_session, sessionmaker
+
 
 
 # Load environment variables from .env
@@ -23,7 +26,21 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialize database
-db = SQLAlchemy(app)
+#db = SQLAlchemy(app)
+
+# Custom engine with pooling & SSL fix
+engine = create_engine(
+    os.getenv("DATABASE_URL"),
+    pool_pre_ping=True,
+    pool_size=5,
+    max_overflow=2,
+    pool_timeout=30
+)
+
+db = SQLAlchemy()
+db.init_app(app)
+db.engine = engine  # manually override engine to use custom one
+
 
 # Initialize Flask-Login
 
