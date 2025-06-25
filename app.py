@@ -9,10 +9,6 @@ from google.oauth2.service_account import Credentials
 from datetime import datetime
 import os
 import json
-from sqlalchemy import create_engine
-from sqlalchemy.orm import scoped_session, sessionmaker
-
-
 
 # Load environment variables from .env
 load_dotenv()
@@ -25,30 +21,23 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# ✅ Inject engine options to prevent idle disconnects and improve performance
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    "pool_pre_ping": True,
+    "pool_size": 5,
+    "max_overflow": 2,
+    "pool_timeout": 30
+}
+
 # Initialize database
-#db = SQLAlchemy(app)
-
-# Custom engine with pooling & SSL fix
-engine = create_engine(
-    os.getenv("DATABASE_URL"),
-    pool_pre_ping=True,
-    pool_size=5,
-    max_overflow=2,
-    pool_timeout=30
-)
-
-db = SQLAlchemy()
-db.init_app(app)
-db.engine = engine  # manually override engine to use custom one
-
+db = SQLAlchemy(app)
 
 # Initialize Flask-Login
-
-login_manager = LoginManager()
-login_manager.init_app(app)
+login_manager = LoginManager(app)
 
 # Initialize Flask-Migrate
 migrate = Migrate(app, db)
+
 
 
 
