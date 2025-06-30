@@ -1,0 +1,22 @@
+2025-06-30 21:07:19.815 WAT [9512] LOG:  starting PostgreSQL 17.5 on x86_64-windows, compiled by msvc-19.44.35209, 64-bit
+2025-06-30 21:07:19.820 WAT [9512] LOG:  listening on IPv6 address "::1", port 5432
+2025-06-30 21:07:19.821 WAT [9512] LOG:  listening on IPv4 address "127.0.0.1", port 5432
+2025-06-30 21:07:19.895 WAT [9132] LOG:  database system was shut down at 2025-06-30 21:03:16 WAT
+2025-06-30 21:07:19.926 WAT [9512] LOG:  database system is ready to accept connections
+2025-06-30 21:08:01.234 WAT [16644] FATAL:  role "postgres" does not exist
+2025-06-30 21:09:33.158 WAT [14360] FATAL:  database "DELL" does not exist
+2025-06-30 21:12:04.662 WAT [11660] FATAL:  database "mobistockdb" does not exist
+2025-06-30 21:12:19.889 WAT [5244] LOG:  checkpoint starting: time
+2025-06-30 21:12:21.584 WAT [5244] LOG:  checkpoint complete: wrote 18 buffers (0.1%); 0 WAL file(s) added, 0 removed, 0 recycled; write=1.637 s, sync=0.031 s, total=1.696 s; sync files=13, longest=0.009 s, average=0.003 s; distance=27 kB, estimate=27 kB; lsn=0/156F3A8, redo lsn=0/156F350
+2025-06-30 21:22:01.453 WAT [9200] FATAL:  database "mobistockdb" does not exist
+2025-06-30 21:37:19.626 WAT [5244] LOG:  checkpoint starting: time
+2025-06-30 21:39:05.504 WAT [5244] LOG:  checkpoint complete: wrote 968 buffers (5.9%); 0 WAL file(s) added, 0 removed, 0 recycled; write=105.248 s, sync=0.605 s, total=105.878 s; sync files=303, longest=0.012 s, average=0.002 s; distance=4530 kB, estimate=4530 kB; lsn=0/19DBF40, redo lsn=0/19DBEB0
+2025-06-30 22:07:50.607 WAT [9512] LOG:  could not reserve shared memory region (addr=000001EF589B0000) for child 0000000000001484: error code 487
+2025-06-30 22:58:37.186 WAT [9512] LOG:  received fast shutdown request
+2025-06-30 22:58:37.192 WAT [9512] LOG:  aborting any active transactions
+2025-06-30 22:58:37.199 WAT [12476] ERROR:  canceling statement due to user request
+2025-06-30 22:58:37.219 WAT [9512] LOG:  background worker "logical replication launcher" (PID 12476) exited with exit code 1
+2025-06-30 22:58:37.219 WAT [5244] LOG:  shutting down
+2025-06-30 22:58:37.222 WAT [5244] LOG:  checkpoint starting: shutdown immediate
+2025-06-30 22:58:37.245 WAT [5244] LOG:  checkpoint complete: wrote 0 buffers (0.0%); 0 WAL file(s) added, 0 removed, 0 recycled; write=0.002 s, sync=0.001 s, total=0.026 s; sync files=0, longest=0.000 s, average=0.000 s; distance=0 kB, estimate=4077 kB; lsn=0/19DBFF0, redo lsn=0/19DBFF0
+2025-06-30 22:58:37.266 WAT [9512] LOG:  database system is shut down
