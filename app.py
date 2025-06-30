@@ -10,7 +10,6 @@ from datetime import datetime
 import os
 import json
 
-
 # Load environment variables from .env
 load_dotenv()
 
@@ -22,16 +21,23 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# ✅ Inject engine options to prevent idle disconnects and improve performance
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    "pool_pre_ping": True,
+    "pool_size": 5,
+    "max_overflow": 2,
+    "pool_timeout": 30
+}
+
 # Initialize database
 db = SQLAlchemy(app)
 
 # Initialize Flask-Login
-
-login_manager = LoginManager()
-login_manager.init_app(app)
+login_manager = LoginManager(app)
 
 # Initialize Flask-Migrate
 migrate = Migrate(app, db)
+
 
 
 
