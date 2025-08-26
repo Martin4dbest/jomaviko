@@ -344,17 +344,15 @@ SPREADSHEET_ID = os.getenv('GOOGLE_SHEET_ID')
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
 
-# Authenticate using the service account JSON from the environment
 def authenticate_google_sheets():
     try:
-        service_account_info = json.loads(os.getenv("SERVICE_ACCOUNT_JSON"))
-        credentials = Credentials.from_service_account_info(service_account_info, scopes=SCOPES)
+        service_account_file = os.getenv("SERVICE_ACCOUNT_FILE")
+        credentials = Credentials.from_service_account_file(service_account_file, scopes=SCOPES)
         service = build('sheets', 'v4', credentials=credentials)
         return service
     except Exception as e:
         print(f"❌ Error during Google Sheets authentication: {e}")
         return None
-
 
 
 
