@@ -337,7 +337,7 @@ def get_google_sheet_data():
 
 # The ID of your Google Sheet (loaded from .env)
 SPREADSHEET_ID = os.getenv('GOOGLE_SHEET_ID')
-
+SERVICE_ACCOUNT_FILE = os.getenv("SERVICE_ACCOUNT_FILE") 
 # Google Sheets API scope
 #SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
 
@@ -346,8 +346,14 @@ SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
 def authenticate_google_sheets():
     try:
-        service_account_file = os.getenv("SERVICE_ACCOUNT_FILE")
-        credentials = Credentials.from_service_account_file(service_account_file, scopes=SCOPES)
+        if os.getenv("SERVICE_ACCOUNT_JSON"):
+            info = json.loads(os.getenv("SERVICE_ACCOUNT_JSON"))
+            credentials = Credentials.from_service_account_info(info, scopes=SCOPES)
+        else:
+            # fallback for local file
+            service_account_file = os.getenv("SERVICE_ACCOUNT_FILE")
+            credentials = Credentials.from_service_account_file(service_account_file, scopes=SCOPES)
+
         service = build('sheets', 'v4', credentials=credentials)
         return service
     except Exception as e:
@@ -355,7 +361,7 @@ def authenticate_google_sheets():
         return None
 
 
-
+        
 def get_google_sheet_data_by_location(sheet_name):
     service = authenticate_google_sheets()
     sheet = service.spreadsheets()
