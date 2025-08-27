@@ -125,17 +125,31 @@
 
       <!-- Flash messages -->
       {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-      <div class="fixed top-4 left-1/2 -translate-x-1/2 z-50 space-y-2 w-[92vw] max-w-xl">
-        {% for category, message in messages %}
-        <div class="px-4 py-3 rounded-xl shadow-lg text-sm font-semibold text-white"
-             {% if category == 'success' %}class="bg-emerald-600"{% elif category == 'danger' %}class="bg-red-600"{% else %}class="bg-gray-700"{% endif %}>
-          {{ message }}
-        </div>
-        {% endfor %}
-      </div>
-      {% endif %}
+        {% if messages %}
+          <div id="flash-messages" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 space-y-2 w-[92vw] max-w-xl">
+            {% for category, message in messages %}
+              <div class="px-4 py-3 rounded-xl shadow-lg text-sm font-semibold text-white
+                          {% if category == 'success' %} bg-emerald-600 
+                          {% elif category == 'danger' %} bg-red-600 
+                          {% else %} bg-gray-700 {% endif %}">
+                {{ message }}
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
       {% endwith %}
+
+      <script>
+        setTimeout(() => {
+          const flash = document.getElementById('flash-messages');
+          if (flash) {
+            flash.style.transition = "opacity 0.5s ease";
+            flash.style.opacity = "0";
+            setTimeout(() => flash.remove(), 500);
+          }
+        }, 3000);
+      </script>
+
 
       <!-- Header / Breadcrumbs -->
       <header class="px-6 lg:px-8 pt-6">
@@ -215,7 +229,7 @@
                   <th class="px-6 py-3 text-left select-none cursor-pointer" @click="sortBy(0)">Product <span x-text="sortHint(0)"></span></th>
                   <th class="px-6 py-3 text-left select-none cursor-pointer" @click="sortBy(1)">ID Number <span x-text="sortHint(1)"></span></th>
                   <th class="px-6 py-3 text-left select-none cursor-pointer" @click="sortBy(2)">Location <span x-text="sortHint(2)"></span></th>
-                  <th class="px-6 py-3 text-left select-none cursor-pointer" @click="sortBy(3)">Retail Price ($) <span x-text="sortHint(3)"></span></th>
+                  <th class="px-6 py-3 text-left select-none cursor-pointer" @click="sortBy(3)">Retail Price (₦) <span x-text="sortHint(3)"></span></th>
                   <th class="px-6 py-3 text-left">Quantity In Stock</th>
                   <th class="px-6 py-3 text-left">Actions</th>
                 </tr>
@@ -226,7 +240,7 @@
                   <td class="px-6 py-3 font-medium text-gray-800 dark:text-gray-100">{{ product.name }}</td>
                   <td class="px-6 py-3 text-gray-600 dark:text-gray-300">{{ product.identification_number }}</td>
                   <td class="px-6 py-3">{{ product.location }}</td>
-                  <td class="px-6 py-3 text-gray-600 dark:text-gray-300">${{ "%.2f"|format(product.price) }}</td>
+                  <td class="px-6 py-3 text-gray-600 dark:text-gray-300">₦{{ "%.2f"|format(product.price) }}</td>
                   <td class="px-6 py-3">
                     <input type="text" id="instock-{{ product.id }}" value="{{ product.in_stock }}" class="w-24 p-2 text-center rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60" readonly />
                   </td>
