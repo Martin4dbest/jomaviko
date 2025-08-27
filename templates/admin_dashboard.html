@@ -1,514 +1,546 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" x-data="dashboard()" x-init="init()" :class="{ 'dark': darkMode }">
 <head>
   <meta charset="UTF-8" />
-  <title>Admin Dashboard - JOMAVIKO CO. LTD</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Dashboard - JOMAVIKO CO. LTD</title>
+
+  <!-- Tailwind: configure BEFORE loading CDN -->
+  <script>
+    window.tailwind = { config: { darkMode: 'class' } };
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!-- Alpine.js -->
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+
   <style>
-    body {
-      font-family: 'Inter', sans-serif;
-    }
-
-    .flash-message {
-      position: absolute;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 999;
-      transition: opacity 0.5s ease-in-out;
-    }
-
-    @media (max-width: 768px) {
-      .sidebar {
-        width: 100%;
-        position: relative;
-      }
-      .main-content {
-        margin-left: 0;
-      }
-    }
+    html, body { height: 100%; }
+    body { font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, 'Helvetica Neue', Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+    /* Smooth sidebar transitions */
+    .sidebar-transition { transition: width 300ms ease, padding 300ms ease; }
   </style>
-  <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      const flashMessages = document.querySelectorAll('.flash-message');
-      if (flashMessages.length > 0) {
-        flashMessages.forEach(function (message) {
-          setTimeout(() => message.remove(), 4000);
-        });
-      }
-
-      // Update Date and Time
-      function updateDateTime() {
-        const now = new Date();
-        const date = now.toLocaleDateString();
-        const time = now.toLocaleTimeString();
-        document.querySelectorAll('.current-date-time').forEach(el => {
-          el.textContent = `${date} ${time}`;
-        });
-      }
-
-      updateDateTime();
-      setInterval(updateDateTime, 1000);
-
-      // This section does NOT trigger import on refresh
-      // Simply refreshes the page but doesn't run the import
-      // So the import process only happens when manually clicked by the admin
-    });
-
-    // Simulate the product import process when manually triggered
-    function importProducts() {
-      console.log('Importing products...');
-      // Replace this with your actual import code
-    }
-
-    // Event listener for the "Import Products" button
-    document.getElementById('import-button').addEventListener('click', function() {
-      importProducts();  // Call your import function here
-    });
-  </script>
-
-  <script>
-    // Filter products based on the search input (product name or location)
-    function filterProducts() {
-      const searchQuery = document.getElementById('search-input').value.toLowerCase();
-      const rows = document.querySelectorAll('.product-row');
-
-      rows.forEach(row => {
-        const productName = row.querySelector('td:nth-child(1)').textContent.toLowerCase();
-        const location = row.querySelector('td:nth-child(3)').textContent.toLowerCase();
-
-        if (productName.includes(searchQuery) || location.includes(searchQuery)) {
-          row.style.display = '';
-        } else {
-          row.style.display = 'none';
-        }
-      });
-    }
-  </script>
-
 </head>
 
- <!-- ✅ Alpine.js Script (place this here) -->
- <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<body class="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100 text-gray-800 dark:from-gray-950 dark:to-gray-900 dark:text-gray-100">
+  <!-- Layout wrapper -->
+  <div class="flex min-h-screen">
+    <!-- Sidebar -->
+    <aside
+      x-data="{ open: true }"
+      :class="open ? 'w-72 px-4' : 'w-16 px-2'"
+      class="sidebar-transition sticky top-0 h-screen bg-gray-900 text-white shadow-2xl flex flex-col z-40">
 
-
-<body class="bg-gray-50 min-h-screen text-gray-800 flex flex-col md:flex-row">
-  
-
-  <!-- Sidebar -->
-<aside
-x-data="{ sidebarOpen: true }"
-class="transition-all duration-300 ease-in-out bg-gray-900 text-white shadow-md flex flex-col"
-:class="sidebarOpen ? 'w-64 p-4' : 'w-16 p-2'"
->
-<!-- Toggle Button -->
-<div class="flex justify-end mb-4">
-  <button
-    @click="sidebarOpen = !sidebarOpen"
-    class="focus:outline-none text-white hover:text-green-400"
-    title="Toggle Sidebar"
-  >
-    <!-- Hamburger Icon -->
-    <svg x-show="!sidebarOpen" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
-      viewBox="0 0 24 24" stroke="currentColor">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-        d="M4 6h16M4 12h16M4 18h16" />
-    </svg>
-
-    <!-- Arrow Icon -->
-    <svg x-show="sidebarOpen" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none"
-      viewBox="0 0 24 24" stroke="currentColor">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-        d="M6 18L18 12L6 6V18Z" />
-    </svg>
-  </button>
-</div>
-
-
-    <!-- Sidebar Header -->
-  <div x-show="sidebarOpen" class="p-4 text-xl font-bold border-b border-gray-700">
-    JOMAVIKO CO. LTD <span style="color: #D4AF37;">Admin - {{ admin_name }}</span>
-  </div>
-
-
-
-  <!-- Sidebar Nav Links -->
-  <nav class="flex-grow space-y-4 text-sm font-medium mt-4" x-show="sidebarOpen">
-    
-  <!-- Sidebar Nav Links -->
-  <nav class="flex-grow space-y-4 text-sm font-medium mt-4" x-show="sidebarOpen">
-    <a href="{{ url_for('select_order_location') }}"
-   class="flex items-center space-x-2 text-gray-300 hover:text-[#D4AF37] transition duration-300">
-  <svg class="w-5 h-5 text-[#D4AF37] group-hover:text-[#D4AF37]" fill="none" stroke="currentColor" stroke-width="2"
-       viewBox="0 0 24 24">
-    <path stroke-linecap="round" stroke-linejoin="round"
-          d="M5 8h14l1 12H4L5 8zm5 0V6a2 2 0 114 0v2" />
-  </svg>
-  <span class="font-medium">Shop Orders</span>
-</a>
-
-
-
-  <a href="{{ url_for('register') }}"
-  class="flex items-center space-x-2 text-gray-300 hover:text-[#10B981] transition duration-300">
-  <svg class="w-5 h-5 text-[#10B981]" fill="none" stroke="currentColor" stroke-width="2"
-      viewBox="0 0 24 24">
-  <path stroke-linecap="round" stroke-linejoin="round"
-        d="M18 9a3 3 0 11-6 0 3 3 0 016 0zM13 16h-1a4 4 0 00-4 4v1h14v-1a4 4 0 00-4-4h-1m-6-4h6" />
-  </svg>
-  <span class="font-medium">Register</span>
-  </a>
-
-
-
-  </nav>
-
-  <!-- Admins and Sellers Details Section -->
-  <div class="mb-6 mt-6">
-    <a href="{{ url_for('view_users') }}"
-       class="flex items-center space-x-2 text-gray-300 hover:text-blue-400 transition duration-300">
-      <svg class="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" stroke-width="2"
-           viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round"
-              d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m8 0a4 4 0 10-8 0m8 0a4 4 0 018 0m-8-6a4 4 0 11-8 0 4 4 0 018 0z" />
-      </svg>
-      <span class="font-medium">Sellers & Admins</span>
-    </a>
-  </div>
-  
-<!-- 
-<div x-data="{ openExportDropdown: false }" class="relative">
-  
-  <button @click="openExportDropdown = !openExportDropdown"
-          class="w-full flex items-center justify-between text-indigo-300 hover:text-indigo-500 transition-colors">
-    <span class="flex items-center space-x-2">
-      <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" stroke-width="2"
-           viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round"
-              d="M12 4v12m0 0l-3-3m3 3l3-3m-6 5h6a2 2 0 002-2V7a2 2 0 00-2-2h-6a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-      </svg>
-      <span class="font-medium">Export Stock</span>
-    </span>
-    <svg :class="{ 'rotate-180': openExportDropdown }" class="ml-2 w-4 h-4 transition-transform text-indigo-400"
-         fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-            d="M19 9l-7 7-7-7"/>
-    </svg>
-  </button>
-
-  <div x-show="openExportDropdown"
-       @click.away="openExportDropdown = false"
-       class="absolute z-50 bg-white text-black p-4 mt-2 rounded shadow w-[300px]">
-    <form method="get" action="{{ url_for('export_stock_history_excel') }}">
-      <div class="mb-2">
-        <label class="block text-sm font-semibold">Start Date</label>
-        <input type="date" class="form-control w-full" name="start_date">
+      <!-- Brand / Toggle -->
+      <div class="flex items-center justify-between py-4 border-b border-gray-800">
+        <div class="flex items-center space-x-2" :class="{ 'opacity-0 pointer-events-none': !open }">
+          <div class="h-8 w-8 rounded-xl bg-amber-500/20 grid place-items-center ring-1 ring-amber-400/30">
+            <svg class="w-5 h-5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 7h18M3 12h18M3 17h18" />
+            </svg>
+          </div>
+          <div class="leading-tight">
+            <div class="text-sm text-gray-400">JOMAVIKO CO. LTD</div>
+            <div class="font-semibold tracking-wide"><span class="text-amber-400">Admin</span> – {{ admin_name }}</div>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <!-- Theme toggle -->
+          <button @click="$root.toggleTheme()" class="p-2 rounded-xl hover:bg-gray-800/70 focus:outline-none" :title="darkMode ? 'Switch to Light' : 'Switch to Dark'">
+            <template x-if="!darkMode">
+              <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364-.707-.707M6.343 6.343l-.707-.707m12.728 0-.707.707M6.343 17.657l-.707.707M12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>
+            </template>
+            <template x-if="darkMode">
+              <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+            </template>
+          </button>
+          <!-- Collapse -->
+          <button @click="open = !open" class="p-2 rounded-xl hover:bg-gray-800/70 focus:outline-none" title="Toggle Sidebar">
+            <svg x-show="open" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>
+            <svg x-show="!open" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+          </button>
+        </div>
       </div>
-      <div class="mb-2">
-        <label class="block text-sm font-semibold">End Date</label>
-        <input type="date" class="form-control w-full" name="end_date">
+
+      <!-- Nav -->
+      <nav class="flex-1 py-4 space-y-1 text-sm">
+        <a href="{{ url_for('select_order_location') }}" class="group flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-gray-800">
+          <svg class="w-5 h-5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 8h14l1 12H4L5 8zm5 0V6a2 2 0 114 0v2"/></svg>
+          <span class="truncate" x-show="open">Shop Orders</span>
+        </a>
+
+        <a href="{{ url_for('register') }}" class="group flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-gray-800">
+          <svg class="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M18 9a3 3 0 11-6 0 3 3 0 016 0zM13 16h-1a4 4 0 00-4 4v1h14v-1a4 4 0 00-4-4h-1m-6-4h6"/></svg>
+          <span class="truncate" x-show="open">Register</span>
+        </a>
+
+        <a href="{{ url_for('view_users') }}" class="group flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-gray-800">
+          <svg class="w-5 h-5 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m8 0a4 4 0 10-8 0m8 0a4 4 0 018 0m-8-6a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+          <span class="truncate" x-show="open">Sellers & Admins</span>
+        </a>
+
+        <a href="{{ url_for('chat') }}" class="group flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-gray-800 relative">
+          <svg class="w-5 h-5 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M7 8h10M7 12h6M21 12a9 9 0 11-9-9 9 9 0 019 9z"/></svg>
+          <span class="truncate" x-show="open">Open Chat</span>
+          <span id="chat-badge" class="hidden absolute top-1 right-1 bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded-full">0</span>
+        </a>
+
+        <!-- Delete All Products -->
+        <form action="{{ url_for('delete_all_products') }}" method="POST" class="px-3" onsubmit="return confirm('Are you sure you want to delete ALL products? This action cannot be undone.')">
+          <button type="submit" class="w-full mt-2 flex items-center gap-3 text-left text-red-400 hover:text-white hover:bg-red-600/80 rounded-xl px-3 py-2">
+            <span class="inline-flex h-5 w-5 items-center justify-center">🗑️</span>
+            <span x-show="open">Delete All Products</span>
+          </button>
+        </form>
+
+        <a href="{{ url_for('index') }}" class="group flex items-center gap-3 rounded-xl px-3 py-2 hover:bg-gray-800 mt-2">
+          <svg class="w-5 h-5 text-rose-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a4 4 0 01-4 4H7"/></svg>
+          <span class="truncate" x-show="open">Logout</span>
+        </a>
+      </nav>
+
+      <div class="mt-auto py-4 text-xs text-gray-400 border-t border-gray-800">
+        <div x-show="open">&copy; 2025 JOMAVIKO CO. LTD</div>
+        <div class="mt-1" x-text="now"></div>
       </div>
-      <div class="mb-2">
-        <label class="block text-sm font-semibold">Admin</label>
-        <select class="form-control w-full" name="admin_id">
-          <option value="">All Admins</option>
-          {% for admin in admins %}
-            <option value="{{ admin.id }}">{{ admin.username }}</option>
-          {% endfor %}
-        </select>
+    </aside>
+
+    <!-- Main content -->
+    <main class="flex-1 min-w-0">
+      <!-- Top bar (mobile) -->
+      <div class="md:hidden sticky top-0 z-30 bg-white/80 dark:bg-gray-900/80 backdrop-blur border-b border-gray-200 dark:border-gray-800">
+        <div class="flex items-center justify-between px-4 py-3">
+          <h1 class="font-extrabold text-lg tracking-tight"><span class="text-amber-600 dark:text-amber-400">Admin</span> Central – JOMAVIKO</h1>
+          <div class="flex items-center gap-2">
+            <button @click="$root.toggleTheme()" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800">
+              <svg x-show="!darkMode" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364-.707-.707M6.343 6.343l-.707-.707m12.728 0-.707.707M6.343 17.657l-.707.707M12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>
+              <svg x-show="darkMode" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+            </button>
+          </div>
+        </div>
       </div>
-      <div class="mb-2">
-        <label class="block text-sm font-semibold">Product</label>
-        <select class="form-control w-full" name="product_id">
-          <option value="">All Products</option>
-          {% for product in products %}
-            <option value="{{ product.id }}">{{ product.name }}</option>
-          {% endfor %}
-        </select>
+
+      <!-- Flash messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <div class="fixed top-4 left-1/2 -translate-x-1/2 z-50 space-y-2 w-[92vw] max-w-xl">
+        {% for category, message in messages %}
+        <div class="px-4 py-3 rounded-xl shadow-lg text-sm font-semibold text-white"
+             {% if category == 'success' %}class="bg-emerald-600"{% elif category == 'danger' %}class="bg-red-600"{% else %}class="bg-gray-700"{% endif %}>
+          {{ message }}
+        </div>
+        {% endfor %}
       </div>
-      <div class="mb-2">
-        <label class="block text-sm font-semibold">Location</label>
-        <input type="text" class="form-control w-full" name="location" placeholder="e.g. Lagos">
-      </div>
-      <button type="submit" class="btn btn-success w-full mt-2">Export</button>
-    </form>
-  </div>
-</div>
--->
+      {% endif %}
+      {% endwith %}
 
-  <!-- 🔴 Delete All Products Button - placed right before Logout -->
- <form action="{{ url_for('delete_all_products') }}" method="POST"
-    onsubmit="return confirm('Are you sure you want to delete ALL products? This action cannot be undone.')" class="mt-4">
-    <button type="submit"
-    class="w-full text-left px-4 py-2 text-sm font-semibold text-red-500 hover:text-white hover:bg-red-600 transition duration-300 rounded-md">
-   🗑️ Delete All Products
-    </button>
-</form>
-
-
-    <a href="{{ url_for('chat') }}" class="text-green-600 hover:text-green-800">Open Chat</a>
-
-    <a href="{{ url_for('chat') }}" class="relative inline-flex items-center">
-      <i class="bi bi-chat-dots text-xl"></i>
-      <span id="chat-badge"
-            class="hidden absolute -top-1 -right-2 bg-red-600 text-white text-xs px-2 py-0.5 rounded-full">
-        0
-      </span>
-    </a>
-    
-
-    <a href="{{ url_for('index') }}" class="block text-white mt-4 hover:text-red-400">
-      Logout
-    </a>
-  </div>
-
-  </nav>
-
-  <!-- Footer -->
-  <div x-show="sidebarOpen" class="p-4 text-xs text-gray-400 border-t border-gray-700">
-    &copy; 2025 JOMAVIKO CO. LTD
-  </div>
-  </aside>
-
-
-
-
-  <!-- Main Content -->
-  <main class="flex-grow p-6 bg-gray-100 main-content">
-
-    <!-- Flash Message -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-    <div class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50">
-      {% for category, message in messages %}
-      <div class="flash-message px-6 py-3 rounded-md shadow-lg text-white text-sm font-semibold
-        {% if category == 'success' %}bg-green-600{% elif category == 'danger' %}bg-red-600{% else %}bg-gray-600{% endif %}">
-        {{ message }}
-      </div>
-      {% endfor %}
-    </div>
-    {% endif %}
-    {% endwith %}
-  
-
-    <!-- Header -->
-
-    <!-- Header -->
-    <div class="flex justify-between items-center mb-6">
-      <h2 class="text-2xl font-extrabold" style="color: #D4AF37; font-family: 'Arial', sans-serif;">
-        Admin Central Management Dashboard - JOMAVIKO CO. LTD
-      </h2>
-    </div>
-
-  
-    </div>
-
-    <form method="POST" class="mb-4">
-      
-      <label for="location" style="color: #6B21A8; font-size: 1.125rem; font-weight: 600; margin-right: 8px;">Select Shop Location:</label><span style="color: #6B21A8;">➡</span>
-
-      <select name="location" id="location" required>
-          <option value="Accra">Accra</option>
-          <option value="Kumasi">Kumasi</option>
-          <option value="Tamale">Tamale</option>
-          <!-- Add other locations here -->
-      </select>
-
-      <button type="submit" name="import_button" value="1" 
-        class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-lg shadow-md">
-        Import Products
-      </button>
-
-
-    
-        
-    </form>
-
-
-    <!-- Search Field -->
-  <div class="mb-4">
-    <input
-      type="text"
-      id="search-input"
-      class="w-1/3 p-2 border border-gray-300 rounded mx-auto block"
-      placeholder="Search product by name and Location..."
-      oninput="filterProducts()"
-    />
-  </div>
-
-    {% if products|length > 0 %}
-      <!-- ✅ Your existing table with product rows goes here -->
-    {% else %}
-      <tr>
-        <td colspan="6" class="text-center py-4 text-red-500">
-          No products found
-        </td>
-      </tr>
-    {% endif %}
-
-      <!-- Product Table -->
-  <div class="bg-white shadow-md rounded-lg overflow-x-auto border border-gray-200 mb-8">
-    <table class="min-w-full text-sm text-left text-gray-700" id="product-table">
-      <thead class="bg-gray-800 text-white">
-        <tr>
-          <th class="px-6 py-3">Product</th>
-          <th class="px-6 py-3">ID Number</th>
-          <th class="px-6 py-3">Location</th>
-          <th class="px-6 py-3">Retail Price ($)</th>
-          <th class="px-6 py-3 border-b">Quantity In Stock</th>
-          <th class="px-6 py-3">Actions</th>
-        </tr>
-      </thead>
-      <tbody id="product-table-body">
-        {% for product in products %}
-        <tr class="border-b hover:bg-gray-200 transition product-row">
-          <td class="px-6 py-3 font-medium text-gray-600">{{ product.name }}</td>
-          <td class="px-6 py-3 text-gray-500">{{ product.identification_number }}</td>
-          <td class="px-6 py-3">{{ product.location }}</td>
-          <td class="px-6 py-3 text-gray-500">${{ "%.2f"|format(product.price) }}</td>
-          <td class="px-6 py-3 border-b">
-            <input
-              type="text"
-              id="instock-{{ product.id }}"
-              value="{{ product.in_stock }}"
-              class="w-20 p-1 text-center bg-gray-50 rounded border border-gray-300"
-              readonly
-            />
-          </td>
-          
-          <td class="px-6 py-3">
-            <form action="{{ url_for('delete_product', product_id=product.id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this product?');">
-              <button type="submit" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md shadow transition">
-                Delete
+      <!-- Header / Breadcrumbs -->
+      <header class="px-6 lg:px-8 pt-6">
+        <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+          <div>
+            <h2 class="text-2xl md:text-3xl font-extrabold tracking-tight"><span class="text-amber-600 dark:text-amber-400">Admin Central</span> Management Dashboard</h2>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Monitor inventory, manage users, and track performance. <span class="current-date-time" x-text="now"></span></p>
+          </div>
+          <!-- Actions -->
+          <div class="flex flex-wrap items-center gap-2">
+            <form method="POST" class="flex items-stretch gap-2">
+              <label for="location" class="sr-only">Select Shop Location</label>
+              <select name="location" id="location" required class="h-10 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-800/60 focus:ring-amber-500 focus:border-amber-500">
+                <option value="Accra">Accra</option>
+                <option value="Kumasi">Kumasi</option>
+                <option value="Tamale">Tamale</option>
+              </select>
+              <button id="import-button" type="submit" name="import_button" value="1" class="h-10 inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-4 shadow">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0 0l-3-3m3 3l3-3m-6 5h6a2 2 0 002-2V7a2 2 0 00-2-2h-6a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                Import Products
               </button>
             </form>
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+          </div>
+        </div>
+      </header>
 
-    <div id="pagination-container" class="text-center mt-4"></div>
+      <!-- KPI Cards -->
+      <section class="px-6 lg:px-8 mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-4 shadow-sm">
+          <div class="text-xs text-gray-500">Total Products</div>
+          <div class="mt-2 flex items-end justify-between">
+            <div class="text-2xl font-bold">{{ products|length }}</div>
+            <div class="text-xs text-emerald-600">Live</div>
+          </div>
+        </div>
+        <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-4 shadow-sm">
+          <div class="text-xs text-gray-500">Low Stock (&le; 3)</div>
+          <div class="mt-2 text-2xl font-bold" x-text="lowStockCount()"></div>
+        </div>
+        <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-4 shadow-sm">
+          <div class="text-xs text-gray-500">Locations</div>
+          <div class="mt-2 text-2xl font-bold" x-text="locationCount()"></div>
+        </div>
+        <div class="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-4 shadow-sm">
+          <div class="text-xs text-gray-500">Last Updated</div>
+          <div class="mt-2 text-2xl font-bold" x-text="now"></div>
+        </div>
+      </section>
 
+      <!-- Search & Filters -->
+      <section class="px-6 lg:px-8 mt-6">
+        <div class="flex flex-col md:flex-row md:items-center gap-3">
+          <div class="relative flex-1 min-w-[220px]">
+            <input id="search-input" type="text" placeholder="Search product or location..." class="w-full h-11 rounded-2xl border border-gray-300 dark:border-gray-700 bg-white/70 dark:bg-gray-900/60 px-4 pr-10 focus:ring-2 focus:ring-amber-500 focus:border-amber-500" @input.debounce.250ms="filterProducts()" />
+            <svg class="absolute right-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-4.35-4.35M10 18a8 8 0 100-16 8 8 0 000 16z"/></svg>
+          </div>
+          <div class="flex items-center gap-2">
+            <label class="text-xs text-gray-500">Rows</label>
+            <select id="rows-per-page" class="h-11 rounded-xl border-gray-300 dark:border-gray-700 dark:bg-gray-900/60" @change="updatePagination()">
+              <option>10</option>
+              <option selected>20</option>
+              <option>50</option>
+              <option>100</option>
+            </select>
+            <button class="h-11 rounded-xl border border-gray-300 dark:border-gray-700 px-3 hover:bg-gray-50 dark:hover:bg-gray-800" @click="resetFilters()">Reset</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Table -->
+      <section class="px-6 lg:px-8 mt-4">
+        <div class="overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow">
+          <div class="overflow-x-auto">
+            <table class="min-w-full text-sm" id="product-table">
+              <thead class="bg-gray-800 text-white sticky top-0 z-10">
+                <tr>
+                  <th class="px-6 py-3 text-left select-none cursor-pointer" @click="sortBy(0)">Product <span x-text="sortHint(0)"></span></th>
+                  <th class="px-6 py-3 text-left select-none cursor-pointer" @click="sortBy(1)">ID Number <span x-text="sortHint(1)"></span></th>
+                  <th class="px-6 py-3 text-left select-none cursor-pointer" @click="sortBy(2)">Location <span x-text="sortHint(2)"></span></th>
+                  <th class="px-6 py-3 text-left select-none cursor-pointer" @click="sortBy(3)">Retail Price ($) <span x-text="sortHint(3)"></span></th>
+                  <th class="px-6 py-3 text-left">Quantity In Stock</th>
+                  <th class="px-6 py-3 text-left">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="product-table-body">
+                {% for product in products %}
+                <tr class="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50/60 dark:hover:bg-gray-800/60 transition product-row">
+                  <td class="px-6 py-3 font-medium text-gray-800 dark:text-gray-100">{{ product.name }}</td>
+                  <td class="px-6 py-3 text-gray-600 dark:text-gray-300">{{ product.identification_number }}</td>
+                  <td class="px-6 py-3">{{ product.location }}</td>
+                  <td class="px-6 py-3 text-gray-600 dark:text-gray-300">${{ "%.2f"|format(product.price) }}</td>
+                  <td class="px-6 py-3">
+                    <input type="text" id="instock-{{ product.id }}" value="{{ product.in_stock }}" class="w-24 p-2 text-center rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60" readonly />
+                  </td>
+                  <td class="px-6 py-3">
+                    <form action="{{ url_for('delete_product', product_id=product.id) }}" method="POST" onsubmit="return confirm('Delete this product?');" class="inline-block">
+                      <button type="submit" class="inline-flex items-center gap-1 rounded-xl bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 text-xs shadow">Delete</button>
+                    </form>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          {% if products|length == 0 %}
+          <div class="p-8 text-center text-sm text-gray-500 dark:text-gray-400">No products found.</div>
+          {% endif %}
+
+          <!-- Pagination -->
+          <div class="flex items-center justify-between gap-3 px-4 py-3 border-t border-gray-200 dark:border-gray-800">
+            <div class="text-xs text-gray-500" x-text="pageSummary"></div>
+            <div id="pagination-container" class="flex flex-wrap items-center gap-1"></div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="px-6 lg:px-8 py-8 text-xs text-gray-500 dark:text-gray-400">
+        Built with ❤️ using TailwindCSS & Alpine.js. Optimized for mobile, tablet, and desktop.
+      </footer>
+    </main>
   </div>
 
-  </main>
-
+  <!-- App Script -->
   <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      const stockInputs = document.querySelectorAll("input[id^='instock-']");
-  
-      stockInputs.forEach(input => {
-        const stockValue = parseInt(input.value.trim());
-        if (!isNaN(stockValue) && stockValue <= 3) {
-          input.classList.add('text-red-600', 'font-semibold');
-          input.classList.remove('bg-gray-50');
-          input.classList.add('bg-red-100');
-          input.title = 'Low stock';
-        }
-      });
-    });
-  </script>
+    function dashboard() {
+      return {
+        // State
+        darkMode: false,
+        now: '',
+        sortIndex: null,
+        sortAsc: true,
+        rowsPerPage: 20,
+        currentPage: 1,
+        totalPages: 1,
+        pageSummary: '',
 
-  <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      const rows = document.querySelectorAll('.product-row');
-      const rowsPerPage = 20;
-      const tableBody = document.getElementById('product-table-body');
-      const totalPages = Math.ceil(rows.length / rowsPerPage);
-      let currentPage = 1;
+        init() {
+          // Theme from storage / prefers
+          const saved = localStorage.getItem('jmk_theme');
+          this.darkMode = saved ? saved === 'dark' : window.matchMedia('(prefers-color-scheme: dark)').matches;
+          this.tick();
+          setInterval(() => this.tick(), 1000);
 
-      function displayPage(page) {
-        tableBody.innerHTML = ''; // Clear existing rows
-        const start = (page - 1) * rowsPerPage;
-        const end = start + rowsPerPage;
+          // Rows per page control
+          const rpp = document.getElementById('rows-per-page');
+          if (rpp) this.rowsPerPage = parseInt(rpp.value, 10) || 20;
 
-        rows.forEach((row, index) => {
-          if (index >= start && index < end) {
-            tableBody.appendChild(row);
+          // Highlight low stock
+          this.highlightLowStock();
+
+          // Initial pagination render
+          this.updatePagination();
+
+          // Unread chat polling
+          this.fetchUnreadMessages();
+          setInterval(() => this.fetchUnreadMessages(), 10000);
+
+          // Import Products button (no auto-run on refresh)
+          const importBtn = document.getElementById('import-button');
+          if (importBtn) {
+            importBtn.addEventListener('click', () => {
+              console.log('Importing products...');
+            });
           }
-        });
+        },
 
-        renderPagination();
-      }
+        toggleTheme() {
+          this.darkMode = !this.darkMode;
+          localStorage.setItem('jmk_theme', this.darkMode ? 'dark' : 'light');
+        },
 
-      function renderPagination() {
-        let paginationHTML = '';
+        tick() {
+          const d = new Date();
+          this.now = d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
+        },
 
-        // Previous Button
-        paginationHTML += `
-          <button 
-            class="px-3 py-1 m-1 rounded ${currentPage === 1 ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-gray-700 text-white'}" 
-            onclick="changePage(${currentPage - 1})" 
-            ${currentPage === 1 ? 'disabled' : ''}
-          >
-            Prev
-          </button>
-        `;
+        // Table helpers
+        rows() { return Array.from(document.querySelectorAll('.product-row')); },
 
-        // Page Number Buttons
-        for (let i = 1; i <= totalPages; i++) {
-          paginationHTML += `
-            <button 
-              class="px-3 py-1 m-1 rounded ${i === currentPage ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-800'}" 
-              onclick="changePage(${i})"
-            >
-              ${i}
-            </button>
-          `;
-        }
+        highlightLowStock() {
+          this.rows().forEach(row => {
+            const input = row.querySelector("input[id^='instock-']");
+            const v = parseInt((input?.value || '').trim(), 10);
+            if (!isNaN(v) && v <= 3) {
+              input.classList.add('text-red-600', 'font-semibold', 'bg-red-50', 'dark:bg-red-900/20');
+              input.title = 'Low stock';
+            }
+          });
+        },
 
-        // Next Button
-        paginationHTML += `
-          <button 
-            class="px-3 py-1 m-1 rounded ${currentPage === totalPages ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-gray-700 text-white'}" 
-            onclick="changePage(${currentPage + 1})" 
-            ${currentPage === totalPages ? 'disabled' : ''}
-          >
-            Next
-          </button>
-        `;
+        lowStockCount() {
+          return this.rows().filter(row => {
+            const input = row.querySelector("input[id^='instock-']");
+            const v = parseInt((input?.value || '').trim(), 10);
+            return !isNaN(v) && v <= 3;
+          }).length;
+        },
 
-        document.getElementById('pagination-container').innerHTML = paginationHTML;
-      }
+        locationCount() {
+          const set = new Set();
+          this.rows().forEach(r => set.add(r.children[2]?.textContent?.trim()));
+          return Array.from(set).filter(Boolean).length;
+        },
 
-      window.changePage = function (page) {
-        if (page < 1 || page > totalPages) return;
-        currentPage = page;
-        displayPage(page);
-      };
+        filterProducts() {
+          const q = (document.getElementById('search-input')?.value || '').toLowerCase();
+          this.rows().forEach(row => {
+            const name = row.children[0]?.textContent?.toLowerCase() || '';
+            const loc  = row.children[2]?.textContent?.toLowerCase() || '';
+            row.style.display = (name.includes(q) || loc.includes(q)) ? '' : 'none';
+          });
+          this.updatePagination();
+        },
 
-      // Initial load
-      displayPage(currentPage);
-    });
-  </script>
+        resetFilters() {
+          const input = document.getElementById('search-input');
+          if (input) input.value = '';
+          this.filterProducts();
+          this.sortIndex = null; // clear sort indicator
+        },
 
-  <script>
-    function fetchUnreadMessages() {
-      fetch('/api/unread-messages')
-        .then(response => response.json())
-        .then(data => {
-          const badge = document.getElementById('chat-badge');
-          if (data.unread_count > 0) {
-            badge.textContent = data.unread_count;
-            badge.classList.remove('hidden');
-          } else {
-            badge.classList.add('hidden');
+        sortBy(index) {
+          const body = document.getElementById('product-table-body');
+          const rows = this.rows().filter(r => r.style.display !== 'none');
+          if (this.sortIndex === index) { this.sortAsc = !this.sortAsc; } else { this.sortIndex = index; this.sortAsc = true; }
+
+          const parseVal = (td, i) => {
+            const t = td.children[i]?.textContent?.trim() || '';
+            if (i === 3) { // price column
+              return parseFloat(t.replace(/[^0-9.\-]/g, '')) || 0;
+            }
+            if (i === 4) { // stock input value
+              const inp = td.children[i]?.querySelector('input');
+              return parseInt(inp?.value || '0', 10) || 0;
+            }
+            // default string
+            return t.toLowerCase();
+          };
+
+          rows.sort((a, b) => {
+            const av = parseVal(a, index);
+            const bv = parseVal(b, index);
+            if (typeof av === 'number' && typeof bv === 'number') return this.sortAsc ? av - bv : bv - av;
+            return this.sortAsc ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+          });
+
+          // re-append
+          rows.forEach(r => body.appendChild(r));
+          this.updatePagination(true);
+        },
+
+        sortHint(i) {
+          if (this.sortIndex !== i) return '';
+          return this.sortAsc ? '▲' : '▼';
+        },
+
+        // Pagination
+        visibleRows() { return this.rows().filter(r => r.style.display !== 'none'); },
+
+        updatePagination(resetPage = false) {
+          const rppEl = document.getElementById('rows-per-page');
+          if (rppEl) this.rowsPerPage = parseInt(rppEl.value, 10) || this.rowsPerPage;
+
+          const rows = this.visibleRows();
+          this.totalPages = Math.max(1, Math.ceil(rows.length / this.rowsPerPage));
+          if (resetPage) this.currentPage = 1;
+          if (this.currentPage > this.totalPages) this.currentPage = this.totalPages;
+
+          const start = (this.currentPage - 1) * this.rowsPerPage;
+          const end = start + this.rowsPerPage;
+
+          // hide all, then show the slice
+          this.rows().forEach((r, idx) => { r.style.display = r.style.display === 'none' ? 'none' : 'none'; });
+          rows.forEach((r, idx) => { if (idx >= start && idx < end) r.style.display = ''; });
+
+          // Build pagination UI
+          const container = document.getElementById('pagination-container');
+          if (!container) return;
+          container.innerHTML = '';
+
+          const btn = (label, page, disabled = false, active = false) => {
+            const b = document.createElement('button');
+            b.textContent = label;
+            b.className = `px-3 py-1.5 rounded-xl border ${active ? 'bg-gray-800 text-white border-gray-800' : 'bg-white dark:bg-gray-900 border-gray-300 dark:border-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800'}`;
+            b.disabled = disabled;
+            if (!disabled) b.addEventListener('click', () => { this.currentPage = page; this.updatePagination(); });
+            return b;
+          };
+
+          container.appendChild(btn('Prev', Math.max(1, this.currentPage - 1), this.currentPage === 1));
+
+          // windowed page numbers
+          const win = 2; // pages around current
+          const pages = [];
+          for (let i = 1; i <= this.totalPages; i++) {
+            if (i === 1 || i === this.totalPages || (i >= this.currentPage - win && i <= this.currentPage + win)) pages.push(i);
           }
-        })
-        .catch(err => console.error('Failed to fetch unread messages', err));
+          let last = 0;
+          pages.forEach(p => {
+            if (p - last > 1) {
+              const ell = document.createElement('span');
+              ell.textContent = '…';
+              ell.className = 'px-1 text-gray-400';
+              container.appendChild(ell);
+            }
+            container.appendChild(btn(String(p), p, false, p === this.currentPage));
+            last = p;
+          });
+
+          container.appendChild(btn('Next', Math.min(this.totalPages, this.currentPage + 1), this.currentPage === this.totalPages));
+
+          // Summary text
+          const total = rows.length;
+          const from = total ? start + 1 : 0;
+          const to = Math.min(total, end);
+          this.pageSummary = `${from}-${to} of ${total} items`;
+
+          // re-apply low stock highlight after slicing
+          this.highlightLowStock();
+        },
+
+        // Chat badge
+        fetchUnreadMessages() {
+          fetch('/api/unread-messages')
+            .then(r => r.json())
+            .then(data => {
+              const badge = document.getElementById('chat-badge');
+              if (!badge) return;
+              if (data.unread_count > 0) {
+                badge.textContent = data.unread_count;
+                badge.classList.remove('hidden');
+              } else {
+                badge.classList.add('hidden');
+              }
+            })
+            .catch(() => {/* silent */});
+        },
+      }
     }
-  
-    // Initial load and repeat every 10 seconds
-    fetchUnreadMessages();
-    setInterval(fetchUnreadMessages, 10000);
   </script>
-  
 
-  
-  
+  <script>
+document.addEventListener('DOMContentLoaded', function () {
+  const rows = Array.from(document.querySelectorAll('.product-row'));
+  const rowsPerPage = 20;
+  const tableBody = document.getElementById('product-table-body');
+  const paginationContainer = document.getElementById('pagination-container');
+  const totalPages = Math.ceil(rows.length / rowsPerPage);
+  let currentPage = 1;
+
+  function displayPage(page) {
+    tableBody.innerHTML = ''; // Clear old rows
+    const start = (page - 1) * rowsPerPage;
+    const end = start + rowsPerPage;
+
+    rows.forEach((row, index) => {
+      row.style.display = (index >= start && index < end) ? '' : 'none';
+      if (index >= start && index < end) {
+        tableBody.appendChild(row);
+      }
+    });
+
+    renderPagination();
+  }
+
+  function renderPagination() {
+    paginationContainer.innerHTML = ''; // clear
+
+    // Prev button
+    const prevBtn = document.createElement('button');
+    prevBtn.textContent = 'Prev';
+    prevBtn.className = `px-3 py-1 m-1 rounded ${currentPage === 1 ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-gray-700 text-white'}`;
+    prevBtn.disabled = currentPage === 1;
+    prevBtn.onclick = () => changePage(currentPage - 1);
+    paginationContainer.appendChild(prevBtn);
+
+    // Page numbers
+    for (let i = 1; i <= totalPages; i++) {
+      const btn = document.createElement('button');
+      btn.textContent = i;
+      btn.className = `px-3 py-1 m-1 rounded ${i === currentPage ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-800 hover:bg-gray-300'}`;
+      btn.onclick = () => changePage(i);
+      paginationContainer.appendChild(btn);
+    }
+
+    // Next button
+    const nextBtn = document.createElement('button');
+    nextBtn.textContent = 'Next';
+    nextBtn.className = `px-3 py-1 m-1 rounded ${currentPage === totalPages ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-gray-700 text-white'}`;
+    nextBtn.disabled = currentPage === totalPages;
+    nextBtn.onclick = () => changePage(currentPage + 1);
+    paginationContainer.appendChild(nextBtn);
+  }
+
+  function changePage(page) {
+    if (page < 1 || page > totalPages) return;
+    currentPage = page;
+    displayPage(page);
+  }
+
+  // Initial load
+  displayPage(currentPage);
+});
+</script>
 
 </body>
 </html>
