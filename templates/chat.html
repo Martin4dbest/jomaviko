@@ -1,213 +1,247 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" x-data="chatApp()" x-init="init()" :class="{'bg-black': dark}">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Chat</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Chat — {{ target_user.username }}</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
   <style>
-    .context-menu {
-      position: absolute;
-      z-index: 9999;
-      background-color: white;
-      border: 1px solid #ccc;
-      padding: 0.5rem;
-      display: none;
-      min-width: 100px;
-      border-radius: 0.375rem;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-
-    .context-menu a {
-      display: block;
-      padding: 0.25rem 0.5rem;
-      color: #333;
-      cursor: pointer;
-    }
-
-    .context-menu a:hover {
-      background-color: #f0f0f0;
-    }
-
-    /* Ensure buttons have proper spacing */
-    .button-group {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-
-    /* For larger screens, keep buttons in row */
-    @media (min-width: 640px) {
-      .button-group {
-        flex-direction: row;
-        justify-content: space-between;
-      }
-    }
+    /* Small scrollbar styling for chat box */
+    .chat-scroll::-webkit-scrollbar { width: 10px; }
+    .chat-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 999px; }
+    .msg-bubble { max-width: 78%; }
+    .date-sep { font-size: 0.8rem; }
   </style>
 </head>
-<body class="bg-stone-800">
+<body class="min-h-screen bg-gray-100 text-gray-900">
+  <div class="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8">
 
-  <div class="container mx-auto p-6 max-w-3xl bg-stone-900 rounded-lg shadow-lg mt-10 text-white">
-    <h2 class="text-2xl font-semibold mb-6">
-      Chat with {{ target_user.username }} ({{ target_user.location }})
-    </h2>
-
-    <div id="chat-box" class="chat-box space-y-6 mb-6 overflow-y-auto max-h-[70vh] scroll-smooth">
-      {% for message in messages %}
-        <div class="flex {{ 'justify-end' if message.sender_id == current_user.id else 'justify-start' }}">
-          <div class="relative max-w-xs p-4 rounded-lg 
-            {% if message.sender_id == current_user.id %} bg-green-100 text-gray-900 {% else %} bg-gray-200 text-gray-900 {% endif %}"
-            data-message-id="{{ message.id }}" 
-            data-message-text="{{ message.content|tojson }}">
-
-            <strong class="block text-sm font-semibold">
-              {{ 'You' if message.sender_id == current_user.id else message.sender.username }}
-              <span class="text-xs text-gray-500 ml-2">
-                {{ message.timestamp.strftime('%I:%M %p, %b %d') }}
-              </span>
-            </strong>
-
-            <p class="text-base" id="message-text-{{ message.id }}">{{ message.content }}</p>
-          </div>
+    <!-- Header -->
+    <header class="flex items-center justify-between gap-4 mb-4">
+      <div class="flex items-center gap-3">
+        <a href="{{ url_for('view_users') }}" class="inline-flex items-center text-sm text-gray-600 hover:text-gray-800">
+          ← Back
+        </a>
+        <div class="w-12 h-12 rounded-full bg-gray-300 overflow-hidden flex items-center justify-center">
+          {% if target_user.avatar_url %}
+            <img src="{{ target_user.avatar_url }}" alt="{{ target_user.username }}" class="w-full h-full object-cover" />
+          {% else %}
+            <span class="text-xl font-semibold text-gray-700">{{ target_user.username[0]|upper }}</span>
+          {% endif %}
         </div>
-      {% endfor %}
-    </div>
+        <div>
+          <div class="font-semibold text-lg">{{ target_user.username }}</div>
+          <div class="text-xs text-gray-500">{{ target_user.location or 'Unknown location' }} • <span x-text="onlineStatus"></span></div>
+        </div>
+      </div>
 
-    <!-- Context Menu -->
-    <div id="context-menu" class="context-menu">
-      <a href="#" onclick="editMessage()">Edit</a>
-      <a href="#" onclick="deleteMessage()">Delete</a>
-    </div>
+      <div class="flex items-center gap-2">
+        <button @click="clearChatConfirm" class="px-3 py-2 rounded-md bg-red-600 text-white text-sm hover:bg-red-700">Clear Chat</button>
+        <button @click="exportChat" class="px-3 py-2 rounded-md bg-blue-600 text-white text-sm hover:bg-blue-700">Export</button>
+      </div>
+    </header>
 
-    <!-- Message Input Form -->
-    <form method="POST" action="{{ url_for('send_message', user_id=target_user.id) }}" class="flex space-x-4 mt-4">
-      <input type="text" name="content" placeholder="Type your message..." required 
-       class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 text-black bg-white">
-      <button type="submit" 
-              class="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 focus:outline-none transition-colors duration-300">
-        Send
-      </button>
-    </form>
+    <!-- Chat area -->
+    <main class="bg-white rounded-2xl shadow p-4 flex flex-col h-[72vh]">
+
+      <!-- messages list -->
+      <div id="chatBox" class="flex-1 overflow-auto mb-3 chat-scroll" x-ref="box" @scroll="onScroll()">
+        <template x-for="(group, idx) in groupedMessages" :key="group.id">
+          <div>
+            <!-- Date separator -->
+            <div class="flex items-center justify-center my-4">
+              <div class="px-3 py-1 rounded-full bg-gray-100 text-gray-500 date-sep" x-text="group.date"></div>
+            </div>
+
+            <!-- messages in group -->
+            <template x-for="msg in group.messages" :key="msg.id">
+              <div class="flex items-end gap-3 mb-3" :class="msg.isMe ? 'justify-end' : 'justify-start'">
+
+                <!-- avatar (left side for incoming) -->
+                <template x-if="!msg.isMe">
+                  <div class="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-sm flex-shrink-0">
+                    <img x-show="msg.sender_avatar" :src="msg.sender_avatar" class="w-full h-full object-cover rounded-full" />
+                    <span x-show="!msg.sender_avatar" x-text="msg.sender_initial"></span>
+                  </div>
+                </template>
+
+                <!-- bubble -->
+                <div class="relative msg-bubble">
+                  <div :class="msg.isMe ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-900'" class="px-4 py-2 rounded-2xl shadow-sm break-words">
+                    <div class="text-sm" x-html="msg.content_html"></div>
+                    <div class="text-[11px] text-gray-400 mt-1 flex items-center gap-2">
+                      <span x-text="formatTime(msg.timestamp)"></span>
+                      <span x-show="msg.edited" class="italic">(edited)</span>
+                      <template x-if="msg.isMe">
+                        <svg x-show="msg.status === 'sending'" xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 animate-spin text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v4m0 8v4m8-8h-4M4 12H8"/></svg>
+                        <svg x-show="msg.status === 'sent'" xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-white" viewBox="0 0 24 24"><path fill="currentColor" d="M20.285 6.708l-11.02 11.02-5.57-5.57L5.7 10.854l3.565 3.564L18.44 5.244z"/></svg>
+                      </template>
+                    </div>
+                  </div>
+
+                  <!-- small action menu for own messages (hover) -->
+                  <div class="absolute -bottom-6 right-0 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity" x-show="msg.isMe">
+                    <button @click="startEdit(msg)" class="text-xs text-gray-500 hover:text-gray-700">Edit</button>
+                    <button @click="confirmDelete(msg)" class="text-xs text-red-500 hover:text-red-700">Delete</button>
+                  </div>
+                </div>
+
+                <!-- avatar placeholder for outgoing (right) -->
+                <template x-if="msg.isMe">
+                  <div class="w-9 h-9 rounded-full bg-green-600 flex items-center justify-center text-white text-sm">You</div>
+                </template>
+              </div>
+            </template>
+          </div>
+        </template>
+
+        <!-- New messages indicator when scrolled up -->
+        <div x-show="newCount > 0" class="fixed bottom-24 left-1/2 -translate-x-1/2 z-50">
+          <button @click="jumpToBottom()" class="px-4 py-2 rounded-full bg-amber-500 text-white">Jump to new messages ( <span x-text="newCount"></span> )</button>
+        </div>
+      </div>
+
+      <!-- typing indicator + input -->
+      <div class="mt-2">
+        <div class="flex items-center gap-3 mb-2">
+          <div x-show="typing" class="text-xs text-gray-500 italic">{{ target_user.username }} is typing…</div>
+        </div>
+
+        <form @submit.prevent="sendMessage" class="flex items-end gap-3">
+          <textarea x-ref="input" x-model="draft" @keydown.enter.prevent="onEnter($event)" @input.debounce.300ms="notifyTyping()" rows="1" placeholder="Write a message — Shift+Enter for newline" class="flex-1 px-4 py-2 rounded-xl border resize-none focus:outline-none focus:ring-2 focus:ring-emerald-400"></textarea>
+          <button type="button" @click="attachFile" class="px-3 py-2 rounded-xl border">📎</button>
+          <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 text-white">Send</button>
+        </form>
+      </div>
+
+    </main>
+
+  </div>
+<!-- Server-injected JSON (safe to edit in VSCode) -->
+<script id="initial-data" type="application/json">
+{{ {
+  'messages': messages,
+  'current_user_id': current_user.id,
+  'target_user_id': target_user.id,
+  'urls': {
+    'send_message': url_for('send_message', user_id=target_user.id),
+    'get_messages': url_for('get_messages', user_id=target_user.id),
+    'clear_chat': url_for('clear_chat', user_id=target_user.id),
+    'export_chat': url_for('export_chat', user_id=target_user.id),
+    'edit_message_base': '/edit_message/',
+    'delete_message_base': '/delete_message/'
+  }
+} | tojson | safe }}
+</script>
+
+
+</body>formatTime(ts) { 
+  const d = new Date(ts); 
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
+},
+
+escapeHtml(s) { 
+  if (!s) return ''; 
+  return String(s).replace(/\n/g, '<br/>'); 
+},
+formatTime(ts) { 
+  const d = new Date(ts); 
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
+},
+
+escapeHtml(s) { 
+  if (!s) return ''; 
+  return String(s).replace(/\n/g, '<br/>'); 
+},
+formatTime(ts) { 
+  const d = new Date(ts); 
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
+},
+
+escapeHtml(s) { 
+  if (!s) return ''; 
+  return String(s).replace(/\n/g, '<br/>'); 
+},
+formatTime(ts) { 
+  const d = new Date(ts); 
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
+},
+
+escapeHtml(s) { 
+  if (!s) return ''; 
+  return String(s).replace(/\n/g, '<br/>'); 
+},
+formatTime(ts) { 
+  const d = new Date(ts); 
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
+},
+
+escapeHtml(s) { 
+  if (!s) return ''; 
+  return String(s).replace(/\n/g, '<br/>'); 
+},formatTime(ts) { 
+  const d = new Date(ts); 
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
+},
+
+escapeHtml(s) { 
+  if (!s) return ''; 
+  return String(s).replace(/\n/g, '<br/>'); 
+},formatTime(ts) { 
+  const d = new Date(ts); 
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
+},
+
+escapeHtml(s) { 
+  if (!s) return ''; 
+  return String(s).replace(/\n/g, '<br/>'); 
+},formatTime(ts) { 
+  const d = new Date(ts); 
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
+},
+
+escapeHtml(s) { 
+  if (!s) return ''; 
+  return String(s).replace(/\n/g, '<br/>'); 
+},
+formatTime(ts) { 
+  const d = new Date(ts); 
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
+},
+
+escapeHtml(s) { 
+  if (!s) return ''; 
+  return String(s).replace(/\n/g, '<br/>'); 
+},formatTime(ts) { 
+  const d = new Date(ts); 
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
+},
+
+escapeHtml(s) { 
+  if (!s) return ''; 
+  return String(s).replace(/\n/g, '<br/>'); 
+},formatTime(ts) { 
+  const d = new Date(ts); 
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
+},
+
+escapeHtml(s) { 
+  if (!s) return ''; 
+  return String(s).replace(/\n/g, '<br/>'); 
+},
+formatTime(ts) { 
+  const d = new Date(ts); 
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
+},
+
+escapeHtml(s) { 
+  if (!s) return ''; 
+  return String(s).replace(/\n/g, '<br/>'); 
+},
 
 
 
-        <div class="mt-10 flex justify-between items-center">
-    <!-- Return Button -->
-    <div>
-        {% if current_user.role == 'admin' %}
-        <a href="{{ url_for('admin_dashboard') }}" class="text-teal-600 font-semibold hover:text-teal-700 focus:outline-none transition-colors duration-300">
-            ← Return to Admin Dashboard
-        </a>
-        {% elif current_user.role == 'seller' %}
-        <a href="{{ url_for('seller_dashboard') }}" class="text-teal-600 font-semibold hover:text-teal-700 focus:outline-none transition-colors duration-300">
-            ← Return to Seller Dashboard
-        </a>
-        {% endif %}
-    </div>
-    
-    <!-- Clear Chat Button -->
-    <div>
-        <button onclick="clearChat()" class="px-4 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 focus:outline-none transition-colors duration-300 text-sm">
-        Clear Chat
-        </button>
-    </div>
-    </div>
 
 
-
-  <script>
-    let currentMessageId = null;
-    let currentMessageText = null;
-
-    document.addEventListener('contextmenu', function (event) {
-      const element = event.target.closest('.relative');
-      if (element && element.hasAttribute('data-message-id')) {
-        event.preventDefault();
-        currentMessageId = element.getAttribute('data-message-id');
-        currentMessageText = element.getAttribute('data-message-text');
-
-        const menu = document.getElementById('context-menu');
-        menu.style.left = `${event.pageX}px`;
-        menu.style.top = `${event.pageY}px`;
-        menu.style.display = 'block';
-        document.addEventListener('click', hideContextMenu);
-      }
-    });
-
-    function hideContextMenu() {
-      document.getElementById('context-menu').style.display = 'none';
-      document.removeEventListener('click', hideContextMenu);
-    }
-
-    function editMessage() {
-      const newText = prompt('Edit your message:', currentMessageText);
-      if (newText !== null) {
-        fetch(`/edit_message/${currentMessageId}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: newText })
-        })
-        .then(response => {
-          if (response.ok) {
-            document.getElementById(`message-text-${currentMessageId}`).textContent = newText;
-          }
-        });
-      }
-      hideContextMenu();
-    }
-
-    function deleteMessage() {
-      if (confirm('Are you sure you want to delete this message?')) {
-        fetch(`/delete_message/${currentMessageId}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
-        })
-        .then(response => {
-          if (response.ok) {
-            document.getElementById(`message-text-${currentMessageId}`).parentElement.remove();
-          }
-        });
-      }
-      hideContextMenu();
-    }
-
-    function clearChat() {
-      if (confirm('Are you sure you want to clear the entire chat?')) {
-        // This will clear the chat box on the front-end
-        const chatBox = document.getElementById('chat-box');
-        chatBox.innerHTML = '';  // Remove all chat messages
-
-        // Optionally, you can make an API call to delete messages on the backend
-        fetch(`/clear_chat/{{ target_user.id }}`, { method: 'POST' })
-          .then(response => {
-            if (response.ok) {
-              console.log('Chat cleared on the backend.');
-            } else {
-              console.error('Error clearing chat on the backend.');
-            }
-          });
-      }
-    }
-
-    // Auto-scroll to bottom
-    function scrollToBottom() {
-      const chatBox = document.getElementById('chat-box');
-      chatBox.scrollTop = chatBox.scrollHeight;
-    }
-
-    // Polling to fetch new messages
-    setInterval(() => {
-      const chatBox = document.getElementById('chat-box');
-      fetch(`/get_messages/{{ target_user.id }}`)
-        .then(res => res.text())
-        .then(html => {
-          chatBox.innerHTML = html;
-          scrollToBottom(); // Always scroll to the bottom after refresh
-        });
-    }, 2000);
-
-    // Scroll on initial page load
-    window.addEventListener('DOMContentLoaded', scrollToBottom);
-  </script>
-</body>
 </html>

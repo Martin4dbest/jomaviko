@@ -5,62 +5,64 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Admin Dashboard - Orders</title>
 
-  <!-- Tailwind CSS -->
+  <!-- Tailwind CSS (utility-first layout) -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Bootstrap CSS -->
+  <!-- Bootstrap (table helpers) -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-
   <style>
-    .hover\:drop-shadow-glow:hover {
-      filter: drop-shadow(0 0 6px #22c55e);
-    }
+    .hover\:drop-shadow-glow:hover { filter: drop-shadow(0 0 6px #22c55e); }
+    /* Make the Bootstrap table a little less cramped */
+    table.table td, table.table th { padding: 0.75rem 0.9rem; }
   </style>
 </head>
 
-<body class="bg-gray-100">
+<body class="bg-gray-100 text-gray-800">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
 
-  <!-- Back Link -->
-  <div class="container my-4">
-    <a href="{{ url_for('admin_dashboard') }}"
-      class="text-lg font-semibold text-green-600 hover:text-green-700 hover:drop-shadow-glow transition-all duration-300 ease-in-out inline-flex items-center">
-      <i class="bi bi-arrow-left-circle-fill text-xl mr-2 animate-pulse"></i> Back to Admin Dashboard
-    </a>
-  </div>
-
-  <!-- Main Content -->
-    <h2 id="products-heading" class="text-center text-2xl font-bold text-[#0a1f44] mb-4">Products Sold</h2>
-
-
-    <!-- Search Bar -->
-    <div class="mb-4 text-center">
-      <input type="text" id="searchInput"
-        class="form-control w-full md:w-1/2 mx-auto p-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-400"
-        placeholder="Search Orders" onkeyup="filterTable()" />
+    <!-- Back Link -->
+    <div class="mb-6">
+      <a href="{{ url_for('admin_dashboard') }}" class="inline-flex items-center gap-2 text-lg font-semibold text-green-600 hover:text-green-700 hover:drop-shadow-glow transition-all">
+        <i class="bi bi-arrow-left-circle-fill text-xl animate-pulse"></i>
+        Back to Admin Dashboard
+      </a>
     </div>
 
+    <!-- Heading + Controls -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+      <h2 id="products-heading" class="text-2xl font-bold text-[#0a1f44]">Products Sold</h2>
+
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
+        <input id="searchInput" type="text" placeholder="Search orders (product, seller, date)..." class="form-control w-full sm:w-72 p-2 rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-400" />
+
+        <select id="rowsPerPageSelect" class="form-select w-28 px-2 py-2 rounded-md border border-gray-300">
+          <option value="10">10 rows</option>
+          <option value="20" selected>20 rows</option>
+          <option value="50">50 rows</option>
+        </select>
+
+        <a id="exportSalesDataBtn" href="{{ url_for('export_sales_data') }}" class="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition">
+          <i class="bi bi-download"></i> Export
+        </a>
+      </div>
+    </div>
 
     <!-- Delete Sales by Location Button -->
-    <div class="text-end mb-3">
+    <div class="text-right mb-3">
       <form action="{{ url_for('delete_sales_by_location') }}" method="POST" onsubmit="return confirm('Are you sure you want to delete all sales for this location?');">
         <input type="hidden" name="location" value="{{ selected_location }}">
-        <button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-all shadow">
+        <button type="submit" class="bg-red-600 text-white px-4 py-2 rounded-md hover:bg-red-700 transition-shadow shadow-sm">
           <i class="bi bi-trash-fill me-2"></i> Delete Sales for This Location
         </button>
       </form>
     </div>
 
-
-    
-
-
-
-    <!-- Orders Table -->
-    <div class="overflow-x-auto">
-      <table class="table table-striped table-bordered table-hover w-full text-sm">
-        <thead style="background-color: #0a1f44;" class="text-white text-center">
+    <!-- Orders Table (responsive) -->
+    <div class="bg-white rounded-lg shadow overflow-x-auto">
+      <table class="table table-striped table-hover w-full text-sm m-0">
+        <thead class="text-white text-center" style="background-color: #0a1f44;">
           <tr>
             <th>Product Name</th>
             <th>Identification Number</th>
@@ -74,7 +76,7 @@
         </thead>
         <tbody id="orderTableBody" class="text-center">
           {% for order in orders %}
-          <tr class="hover:bg-gray-100">
+          <tr class="data-row hover:bg-gray-50">
             <td>{{ order.product.name }}</td>
             <td>{{ order.product.identification_number }}</td>
             <td>{{ order.product.in_stock }}</td>
@@ -85,433 +87,329 @@
             <td>{% if order.date_sold %}{{ order.date_sold.strftime('%Y-%m-%d %H:%M:%S') }}{% else %}No Date Sold{% endif %}</td>
           </tr>
           {% else %}
-          <tr><td colspan="7" class="text-center py-4">No orders found.</td></tr>
+          <tr class="no-data"><td colspan="8" class="py-6 text-gray-500">No orders found.</td></tr>
           {% endfor %}
         </tbody>
       </table>
+
+      <!-- Pagination controls -->
+      <div class="flex items-center justify-between px-4 py-3 border-t">
+        <div class="text-xs text-gray-500" id="pageSummary">0-0 of 0 items</div>
+        <div id="paginationContainer" class="flex items-center gap-1"></div>
+      </div>
     </div>
-  </div>
 
-  <!-- Sales Analytics Charts -->
-  <div class="container my-6">
-    <h4 class="text-center font-bold text-2xl mb-6 text-[#0a1f44]">📈 Sales Analytics</h4>
+    <!-- Totals + Toggle -->
+    <div class="mt-4 flex items-center gap-4 justify-center">
+      <button id="showTotalsBtn" class="px-4 py-2 rounded-md show-totals bg-green-600 text-white">Show Totals</button>
+      <div id="totalsContainer" class="text-center" style="display:none;">
+        <p><strong>Total Quantity Sold:</strong> <span id="totalQuantity">0</span></p>
+        <p><strong>Total Amount Made ($):</strong> $<span id="totalAmount">0.00</span></p>
+      </div>
+    </div>
 
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <!-- Pie Chart Card -->
-      <div class="bg-white p-6 rounded-lg shadow-md flex justify-center">
-        <div class="w-[250px] md:w-[300px]">
-          <h5 class="text-center font-semibold mb-4">Top Products Sold</h5>
+    <!-- Charts -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+      <div class="bg-white p-6 rounded-lg shadow flex justify-center">
+        <div class="w-[280px] md:w-[420px]">
+          <h5 class="text-center font-semibold mb-4">Top Products (Quantity)</h5>
           <canvas id="pieChart"></canvas>
         </div>
       </div>
 
-      <!-- Bar Chart Card -->
-      <div class="bg-white p-6 rounded-lg shadow-md flex justify-center">
-        <div class="w-[250px] md:w-[300px]">
-          <h5 class="text-center font-semibold mb-4">Sales Revenue by Product</h5>
+      <div class="bg-white p-6 rounded-lg shadow flex justify-center">
+        <div class="w-[280px] md:w-[420px]">
+          <h5 class="text-center font-semibold mb-4">Revenue by Product</h5>
           <canvas id="barChart"></canvas>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Top 5 Products -->
-  <div class="container mx-auto p-6">
-    <div class="bg-white p-4 rounded-lg shadow">
-      <h3 class="text-lg font-semibold mb-4">Top 5 Products</h3>
-      <ul id="topProductsList" class="list-disc pl-5 space-y-2 text-gray-700">
-        {% for product, sales in top_5_products %}
-          <li>{{ product }} - {{ sales }} sold</li>
-        {% endfor %}
-      </ul>
+    <!-- Top 5 & Best Seller -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+      <div class="bg-white p-4 rounded-lg shadow">
+        <h3 class="text-lg font-semibold mb-3">Top 5 Products</h3>
+        <ul id="topProductsList" class="list-disc pl-5 space-y-2 text-gray-700">
+          {% for product, sales in top_5_products %}
+            <li>{{ product }} - {{ sales }} sold</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="bg-white p-4 rounded-lg shadow">
+        <h3 class="text-lg font-semibold mb-2">🏆 Best Seller</h3>
+        <p><strong id="bestSellerName">{{ best_seller_name }}</strong> with <strong id="bestSellerSales">{{ best_seller_sales }}</strong> sales</p>
+      </div>
     </div>
+
   </div>
 
-  <div class="card mt-6">
-    <h3 class="text-lg font-semibold mb-2">🏆 Best Seller</h3>
-    <p><strong>{{ best_seller_name }}</strong> with <strong>{{ best_seller_sales }}</strong> sales</p>
-  </div>
-
-
-  <!-- Export Button and Show/Hide Totals Button in same row -->
-  <div class="text-center mt-6 flex justify-center items-center space-x-4">
-    <!-- Export Sales Data Button -->
-    <a href="{{ url_for('export_sales_data') }}" class="bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-all">
-      <i class="bi bi-download me-2"></i> Export Sales Data
-    </a>
-
-    <!-- Show/Hide Totals Button -->
-    <button id="show-totals-button" onclick="calculateAndToggleTotals()" class="show-totals px-4 py-2 rounded-md">
-      Show Totals
-    </button>
-  </div>
-
-  <!-- Totals Section -->
-  <div id="totals-container" class="my-4 text-center" style="display: none;">
-    <p><strong>Total Quantity Sold:</strong> <span id="totalQuantity">0</span></p>
-    <p><strong>Total Amount Made ($):</strong> $<span id="totalAmount">0.00</span></p>
-  </div>
-
-  <style>
-    /* Flex container styles */
-    .flex {
-      display: flex;
-      justify-content: center;  /* Align buttons in the center */
-      align-items: center;      /* Vertically align buttons */
-      gap: 1rem;                /* Add space between buttons */
-    }
-
-    /* Styles for the Show Totals button (Green) */
-    .show-totals {
-      background-color: green;
-      color: white;
-    }
-
-    /* Styles for the Hide Totals button (Brown) */
-    .hide-totals {
-      background-color: brown;
-      color: white;
-    }
-
-    /* Optional: Add hover effect to both buttons */
-    .show-totals:hover, .hide-totals:hover {
-      opacity: 0.8;
-    }
-  </style>
-
-
-
-
-  <!-- Bootstrap Bundle -->
+  <!-- Bootstrap Bundle (kept for table styling) -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 
-  <!-- Analytics Script -->
+  <!-- App Script: optimized client-side pagination + search + charts -->
   <script>
-    function filterTable() {
-      const input = document.getElementById('searchInput');
-      const filter = input.value.toLowerCase();
-      const rows = document.getElementById('orderTableBody').getElementsByTagName('tr');
-      for (let row of rows) {
-        const text = row.innerText.toLowerCase();
-        row.style.display = text.includes(filter) ? '' : 'none';
-      }
-    }
+    document.addEventListener('DOMContentLoaded', () => {
+      // --- Setup state ---
+      const tbody = document.getElementById('orderTableBody');
+      const rawRows = Array.from(tbody.querySelectorAll('tr'));
 
-    function logToChat(message) {
-      const logContainer = document.getElementById("analyticsChatLog");
-      const entry = document.createElement("div");
-      entry.className = "bg-gray-100 p-2 rounded-md";
-      entry.textContent = `📊 ${new Date().toLocaleTimeString()}: ${message}`;
-      logContainer.appendChild(entry);
-    }
+      // dataRows: only real data rows (exclude the "no-data" row if present)
+      const dataRows = rawRows.filter(r => r.classList.contains('data-row'));
 
-    function calculateAndToggleTotals() {
-      const rows = document.getElementById('orderTableBody').getElementsByTagName('tr');
-      let totalQuantity = 0;
-      let totalAmount = 0;
-      let highestAmount = 0;
-      let topProduct = '';
+      // If there are no data rows, keep the no-data row visible and stop pagination
+      const noDataRow = rawRows.find(r => r.classList.contains('no-data')) || null;
 
-      for (let i = 0; i < rows.length; i++) {
-        if (rows[i].style.display === 'none') continue;
-        const cells = rows[i].getElementsByTagName('td');
-        const productName = cells[0].textContent.trim();
-        const quantitySold = parseInt(cells[3].textContent.trim(), 10);
-        const amountSold = parseFloat(cells[5].textContent.trim());
+      let filteredRows = dataRows.slice();
+      let currentPage = 1;
+      const rowsPerPageSelect = document.getElementById('rowsPerPageSelect');
+      let rowsPerPage = parseInt(rowsPerPageSelect.value, 10) || 20;
+      const paginationContainer = document.getElementById('paginationContainer');
+      const pageSummary = document.getElementById('pageSummary');
 
-        if (!isNaN(quantitySold)) totalQuantity += quantitySold;
-        if (!isNaN(amountSold)) {
-          totalAmount += amountSold;
-          if (amountSold > highestAmount) {
-            highestAmount = amountSold;
-            topProduct = productName;
-          }
-        }
+      // Clear existing tbody; we'll render slices
+      tbody.innerHTML = '';
+      if (!dataRows.length && noDataRow) {
+        tbody.appendChild(noDataRow);
       }
 
-      displayTotals(totalQuantity, totalAmount);
-      logToChat(`Total quantity sold: ${totalQuantity}`);
-      logToChat(`Total revenue: $${totalAmount.toFixed(2)}`);
-      if (topProduct) logToChat(`Top performing product: ${topProduct} ($${highestAmount.toFixed(2)})`);
-    }
+      // --- Utility: render a page slice ---
+      function renderPage(page = 1) {
+        rowsPerPage = parseInt(rowsPerPageSelect.value, 10) || rowsPerPage;
+        const total = filteredRows.length;
+        const totalPages = Math.max(1, Math.ceil(total / rowsPerPage));
+        if (page < 1) page = 1;
+        if (page > totalPages) page = totalPages;
+        currentPage = page;
 
-    function displayTotals(totalQuantity, totalAmount) {
-      const totalsContainer = document.getElementById('totals-container');
-      document.getElementById('totalQuantity').textContent = totalQuantity;
-      document.getElementById('totalAmount').textContent = totalAmount.toFixed(2);
-      totalsContainer.style.display = totalsContainer.style.display === 'none' ? 'block' : 'none';
-      document.getElementById('show-totals-button').textContent =
-        totalsContainer.style.display === 'block' ? 'Hide Totals' : 'Show Totals';
-    }
-    
-    function displayTotals(totalQuantity, totalAmount) {
-      const totalsContainer = document.getElementById('totals-container');
-      document.getElementById('totalQuantity').textContent = totalQuantity;
-      document.getElementById('totalAmount').textContent = totalAmount.toFixed(2);
-
-      // Toggle the display of the totals container
-      totalsContainer.style.display = totalsContainer.style.display === 'none' ? 'block' : 'none';
-
-      // Get the button
-      const showTotalsButton = document.getElementById('show-totals-button');
-
-      // Change button text and inline styles
-      if (totalsContainer.style.display === 'block') {
-        showTotalsButton.textContent = 'Hide Totals';
-        showTotalsButton.style.backgroundColor = 'brown';
-        showTotalsButton.style.color = 'white';
-      } else {
-        showTotalsButton.textContent = 'Show Totals';
-        showTotalsButton.style.backgroundColor = 'green';
-        showTotalsButton.style.color = 'white';
-      }
-    }
-
-
-  </script>
-
-
-  <script>
-    document.addEventListener('DOMContentLoaded', function () {
-      // Get the value of the "location" query parameter
-      const urlParams = new URLSearchParams(window.location.search);
-      const location = urlParams.get('location');
-  
-      // Update the heading if location exists
-      if (location) {
-        const heading = document.getElementById('products-heading');
-        heading.textContent = `Products Sold at- ${location}`;
-      }
-    });
-  </script>
-
-<script>
-  document.addEventListener('DOMContentLoaded', function () {
-    const labels = [];
-    const quantities = [];
-    const revenues = [];
-
-    const rows = document.getElementById('orderTableBody').getElementsByTagName('tr');
-    for (let row of rows) {
-      const cells = row.getElementsByTagName('td');
-      if (cells.length >= 6) {
-        const productName = cells[0].textContent.trim();
-        const quantity = parseInt(cells[3].textContent.trim(), 10);
-        const revenue = parseFloat(cells[5].textContent.trim());
-
-        labels.push(productName);
-        quantities.push(quantity);
-        revenues.push(revenue);
-      }
-    }
-
-    // Pie Chart - Quantities Sold
-    const pieCtx = document.getElementById('pieChart').getContext('2d');
-    new Chart(pieCtx, {
-      type: 'pie',
-      data: {
-        labels: labels,
-        datasets: [{
-          label: 'Quantity Sold',
-          data: quantities,
-          backgroundColor: [
-            '#34D399', '#60A5FA', '#FBBF24', '#F87171', '#A78BFA', '#F472B6', '#4ADE80'
-          ],
-          borderWidth: 1
-        }]
-      },
-      options: {
-        responsive: true,
-        plugins: {
-          legend: { position: 'bottom' }
-        }
-      }
-    });
-
-    // Bar Chart - Revenue per Product
-    const barCtx = document.getElementById('barChart').getContext('2d');
-    new Chart(barCtx, {
-      type: 'bar',
-      data: {
-        labels: labels,
-        datasets: [{
-          label: 'Revenue ($)',
-          data: revenues,
-          backgroundColor: '#6366F1'
-        }]
-      },
-      options: {
-        responsive: true,
-        scales: {
-          y: { beginAtZero: true }
-        }
-      }
-    });
-  });
-</script>
-
-<script>
- 
-  const salesData = JSON.parse(`{{ sales_data | tojson | safe }}`); 
-  const products = {};
-  const revenue = {};
-  const salesOverTime = {};
-
-  salesData.forEach(item => {
-    const name = item.product_name;
-    const quantity = parseInt(item.quantity_sold);
-    const price = parseFloat(item.total_price);
-    const date = item.sale_date; // Assume your backend passes a 'sale_date' field
-
-    // Quantity and Revenue aggregation
-    products[name] = (products[name] || 0) + quantity;
-    revenue[name] = (revenue[name] || 0) + price;
-
-    // Sales over Time aggregation
-    if (date) {
-      salesOverTime[date] = (salesOverTime[date] || 0) + price;
-    }
-  });
-
-  const productLabels = Object.keys(products);
-  const quantityData = Object.values(products);
-  const revenueData = Object.values(revenue);
-
-  // Sort salesOverTime by date
-  const sortedDates = Object.keys(salesOverTime).sort();
-  const salesAmounts = sortedDates.map(date => salesOverTime[date]);
-
-  // Pie Chart - Quantity Sold
-  new Chart(document.getElementById('salesPieChart'), {
-    type: 'pie',
-    data: {
-      labels: productLabels,
-      datasets: [{
-        label: 'Products Sold',
-        data: quantityData,
-        backgroundColor: ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#6366f1', '#14b8a6'],
-        hoverOffset: 10,
-      }]
-    }
-  });
-
-  // Bar Chart - Revenue
-  new Chart(document.getElementById('revenueBarChart'), {
-    type: 'bar',
-    data: {
-      labels: productLabels,
-      datasets: [{
-        label: 'Revenue',
-        data: revenueData,
-        backgroundColor: '#3b82f6',
-        borderColor: '#1d4ed8',
-        borderWidth: 1,
-      }]
-    },
-    options: {
-      scales: {
-        y: {
-          beginAtZero: true
-        }
-      }
-    }
-  });
-
-  // Line Chart - Sales Over Time
-  new Chart(document.getElementById('salesLineChart'), {
-    type: 'line',
-    data: {
-      labels: sortedDates,
-      datasets: [{
-        label: 'Total Sales',
-        data: salesAmounts,
-        fill: false,
-        borderColor: '#14b8a6',
-        tension: 0.3
-      }]
-    },
-    options: {
-      scales: {
-        y: {
-          beginAtZero: true
-        }
-      }
-    }
-  });
-
-  // Top 5 Products
-  const topProducts = Object.entries(products)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 5);
-
-  const topProductsList = document.getElementById('topProductsList');
-  topProducts.forEach(([product, qty]) => {
-    const li = document.createElement('li');
-    li.textContent = `${product} - ${qty} sold`;
-    topProductsList.appendChild(li);
-  });
-</script>
-
-<script>
-  const sellerPerformance = JSON.parse(`{{ seller_performance | tojson | safe }}`);
-
-  const sellerNames = Object.keys(sellerPerformance);
-  const sellerSales = Object.values(sellerPerformance);
-
-  const ctx = document.getElementById('sellerPerformanceChart').getContext('2d');
-  new Chart(ctx, {
-      type: 'bar',
-      data: {
-          labels: sellerNames,
-          datasets: [{
-              label: 'Sales by Seller',
-              data: sellerSales,
-              backgroundColor: 'rgba(54, 162, 235, 0.7)'
-          }]
-      },
-      options: {
-          responsive: true
-      }
-  });
-</script>
-<script>
-  document.getElementById('exportStockHistoryBtn').addEventListener('click', function(event) {
-    event.preventDefault(); // prevent normal link behavior
-  
-    fetch(this.href)
-      .then(response => {
-        if (!response.ok) {
-          if (response.status === 404) {
-            alert('🚫 No sales history available for export.');
-          } else {
-            alert('⚠️ An error occurred while exporting sales history.');
-          }
+        tbody.innerHTML = '';
+        if (total === 0) {
+          if (noDataRow) tbody.appendChild(noDataRow);
+          pageSummary.textContent = '0-0 of 0 items';
+          paginationContainer.innerHTML = '';
           return;
         }
-        return response.blob();
-      })
-      .then(blob => {
-        if (blob) {
-          const url = window.URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = 'stock_history_filtered.xlsx';
-          document.body.appendChild(a);
-          a.click();
-          a.remove();
+
+        const start = (page - 1) * rowsPerPage;
+        const end = Math.min(start + rowsPerPage, total);
+
+        const frag = document.createDocumentFragment();
+        for (let i = start; i < end; i++) frag.appendChild(filteredRows[i]);
+        tbody.appendChild(frag);
+
+        pageSummary.textContent = `${start + 1}-${end} of ${total} items`;
+        renderPaginationControls(totalPages);
+      }
+
+      // --- Pagination UI with window + ellipses ---
+      function renderPaginationControls(totalPages) {
+        paginationContainer.innerHTML = '';
+        const createBtn = (label, page, disabled = false, active = false) => {
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.textContent = label;
+          b.className = `px-3 py-1 rounded m-1 ${active ? 'bg-gray-800 text-white' : 'bg-gray-200 hover:bg-gray-300'}`;
+          b.disabled = disabled;
+          if (!disabled) b.addEventListener('click', () => renderPage(page));
+          return b;
+        };
+
+        // Prev
+        paginationContainer.appendChild(createBtn('Prev', Math.max(1, currentPage - 1), currentPage === 1));
+
+        // Windowed pages
+        const win = 2;
+        const pages = [];
+        for (let i = 1; i <= totalPages; i++) {
+          if (i === 1 || i === totalPages || (i >= currentPage - win && i <= currentPage + win)) pages.push(i);
         }
-      })
-      .catch(error => {
-        console.error('Error exporting file:', error);
-        alert('❌ Failed to export sales history.');
+        let last = 0;
+        pages.forEach(p => {
+          if (p - last > 1) {
+            const ell = document.createElement('span');
+            ell.textContent = '…';
+            ell.className = 'px-2 text-gray-500';
+            paginationContainer.appendChild(ell);
+          }
+          paginationContainer.appendChild(createBtn(String(p), p, false, p === currentPage));
+          last = p;
+        });
+
+        // Next
+        paginationContainer.appendChild(createBtn('Next', Math.min(totalPages, currentPage + 1), currentPage === totalPages));
+      }
+
+      // --- Search with debounce ---
+      const searchInput = document.getElementById('searchInput');
+      let searchTimer = null;
+      searchInput.addEventListener('input', () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+          const q = searchInput.value.toLowerCase().trim();
+          filteredRows = dataRows.filter(r => {
+            const txt = r.innerText.toLowerCase();
+            return txt.includes(q);
+          });
+          currentPage = 1;
+          renderPage(1);
+        }, 200);
       });
-  });
+
+      // Rows per page change
+      rowsPerPageSelect.addEventListener('change', () => {
+        rowsPerPage = parseInt(rowsPerPageSelect.value, 10) || rowsPerPage;
+        currentPage = 1;
+        renderPage(1);
+      });
+
+      // Initial render
+      renderPage(1);
+
+      // --- Totals button ---
+      const showTotalsBtn = document.getElementById('showTotalsBtn');
+      const totalsContainer = document.getElementById('totalsContainer');
+      const totalQuantityEl = document.getElementById('totalQuantity');
+      const totalAmountEl = document.getElementById('totalAmount');
+
+      function calculateTotals() {
+        let totalQuantity = 0;
+        let totalAmount = 0;
+        // iterate through visible rows in tbody
+        const visibleRows = Array.from(tbody.querySelectorAll('tr')).filter(r => r.classList.contains('data-row'));
+        visibleRows.forEach(row => {
+          const cells = row.children;
+          const qty = parseInt(cells[3].textContent.trim(), 10) || 0;
+          const amt = parseFloat(cells[5].textContent.trim()) || 0;
+          totalQuantity += qty;
+          totalAmount += amt;
+        });
+        totalQuantityEl.textContent = totalQuantity;
+        totalAmountEl.textContent = totalAmount.toFixed(2);
+      }
+
+      showTotalsBtn.addEventListener('click', () => {
+        if (totalsContainer.style.display === 'none' || totalsContainer.style.display === '') {
+          calculateTotals();
+          totalsContainer.style.display = 'block';
+          showTotalsBtn.textContent = 'Hide Totals';
+          showTotalsBtn.classList.remove('bg-green-600');
+          showTotalsBtn.classList.add('bg-brown-600');
+          showTotalsBtn.style.backgroundColor = 'brown';
+        } else {
+          totalsContainer.style.display = 'none';
+          showTotalsBtn.textContent = 'Show Totals';
+          showTotalsBtn.style.backgroundColor = '';
+          showTotalsBtn.classList.add('bg-green-600');
+        }
+      });
+
+      // --- Export button (graceful client-side download) ---
+      const exportBtn = document.getElementById('exportSalesDataBtn');
+      if (exportBtn) {
+        exportBtn.addEventListener('click', (e) => {
+          // If the server returns a file link directly, leave default behavior
+          // Otherwise use fetch to handle errors gracefully
+          e.preventDefault();
+          fetch(exportBtn.href)
+            .then(r => {
+              if (!r.ok) {
+                if (r.status === 404) alert('🚫 No sales history available for export.');
+                else alert('⚠️ An error occurred while exporting sales history.');
+                throw new Error('Export failed');
+              }
+              return r.blob();
+            })
+            .then(blob => {
+              const url = window.URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = 'sales_data.xlsx';
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+            })
+            .catch(err => console.error('Export error', err));
+        });
+      }
+
+      // --- Charts: use server-provided sales_data JSON if available ---
+      try {
+        const salesData = JSON.parse(`{{ sales_data | tojson | safe }}`) || [];
+        const products = {};
+        const revenue = {};
+        const salesOverTime = {};
+
+        salesData.forEach(item => {
+          const name = item.product_name;
+          const quantity = parseInt(item.quantity_sold) || 0;
+          const price = parseFloat(item.total_price) || 0;
+          const date = item.sale_date || null;
+
+          products[name] = (products[name] || 0) + quantity;
+          revenue[name] = (revenue[name] || 0) + price;
+
+          if (date) {
+            // normalize date to yyyy-mm-dd
+            const d = date.split('T')[0] || date;
+            salesOverTime[d] = (salesOverTime[d] || 0) + price;
+          }
+        });
+
+        const labels = Object.keys(products);
+        const quantities = Object.values(products);
+        const revenues = Object.values(revenue);
+
+        // Pie chart
+        const pieCtx = document.getElementById('pieChart')?.getContext('2d');
+        if (pieCtx) {
+          new Chart(pieCtx, {
+            type: 'pie',
+            data: {
+              labels: labels,
+              datasets: [{ data: quantities, backgroundColor: ['#34D399', '#60A5FA', '#FBBF24', '#F87171', '#A78BFA', '#F472B6', '#4ADE80'] }]
+            },
+            options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+          });
+        }
+
+        // Bar chart
+        const barCtx = document.getElementById('barChart')?.getContext('2d');
+        if (barCtx) {
+          new Chart(barCtx, {
+            type: 'bar',
+            data: { labels: labels, datasets: [{ label: 'Revenue ($)', data: revenues, backgroundColor: '#6366F1' }] },
+            options: { responsive: true, scales: { y: { beginAtZero: true } } }
+          });
+        }
+
+        // Populate Top Products list only if server didn't already render it
+        const topProductsList = document.getElementById('topProductsList');
+        if (topProductsList && topProductsList.children.length === 0) {
+          const top = Object.entries(products).sort((a,b)=>b[1]-a[1]).slice(0,5);
+          top.forEach(([p,qty]) => {
+            const li = document.createElement('li');
+            li.textContent = `${p} - ${qty} sold`;
+            topProductsList.appendChild(li);
+          });
+        }
+
+        // Update best seller placeholders if server didn't
+        const bestSellerNameEl = document.getElementById('bestSellerName');
+        const bestSellerSalesEl = document.getElementById('bestSellerSales');
+        if (bestSellerNameEl && (!bestSellerNameEl.textContent || bestSellerNameEl.textContent.trim() === '')) {
+          const sorted = Object.entries(products).sort((a,b)=>b[1]-a[1]);
+          if (sorted.length) {
+            bestSellerNameEl.textContent = sorted[0][0];
+            bestSellerSalesEl.textContent = sorted[0][1];
+          }
+        }
+
+      } catch (err) {
+        console.warn('Charts: could not parse sales_data or no data provided', err);
+      }
+
+    }); // DOMContentLoaded
   </script>
-  
-
-<canvas id="sellerPerformanceChart"></canvas>
-
-
 
 </body>
 </html>
