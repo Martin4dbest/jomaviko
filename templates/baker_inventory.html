@@ -187,6 +187,33 @@
       </div>
     </section>
 
+
+        <!-- Summary Section (add inside your <main> or where you want) -->
+    <section class="max-w-4xl mx-auto bg-white rounded-2xl shadow p-4 sm:p-6 mb-6">
+      <h2 class="text-xl font-semibold text-gray-800 mb-3">📊 Inventory Summary</h2>
+      <div class="grid grid-cols-2 gap-4 sm:grid-cols-4 text-center">
+        <div class="p-2 border rounded-lg bg-orange-50">
+          <div class="text-sm text-gray-500">Total Purchase Cost</div>
+          <div class="text-lg font-bold text-orange-700">₦ <span x-text="totalPurchaseCost()"></span></div>
+        </div>
+        <div class="p-2 border rounded-lg bg-green-50">
+          <div class="text-sm text-gray-500">Total Usage Cost</div>
+          <div class="text-lg font-bold text-green-700">₦ <span x-text="totalUsageCost()"></span></div>
+        </div>
+        <div class="p-2 border rounded-lg bg-blue-50">
+          <div class="text-sm text-gray-500">Remaining Stock Value</div>
+          <div class="text-lg font-bold text-blue-700">₦ <span x-text="remainingStockValue()"></span></div>
+        </div>
+        <div class="p-2 border rounded-lg bg-purple-50">
+          <div class="text-sm text-gray-500">Stock Note</div>
+          <div class="text-lg font-bold text-purple-700" x-text="stockNote()"></div>
+        </div>
+      </div>
+    </section>
+
+
+
+
     <!-- Submit -->
     <section class="text-center">
       <div class="max-w-md mx-auto">
@@ -223,8 +250,7 @@ function bakerInventory(){
     },
     removePurchase(index){
       const removed = this.purchases.splice(index,1);
-      // remove references from breads if any ingredients pointed to this purchase
-      this.breads.forEach(b=> b.ingredients.forEach(u=> { if (u.purchase_id === removed[0]?.id) u.purchase_id = null; }));
+      this.breads.forEach(b => b.ingredients.forEach(u => { if (u.purchase_id === removed[0]?.id) u.purchase_id = null; }));
     },
 
     addBread(){ this.breads.push({ id: this.nextId(), name: '', ingredients: [] }); },
@@ -233,19 +259,13 @@ function bakerInventory(){
     addIngredientToBread(bIndex){ this.breads[bIndex].ingredients.push({ id: this.nextId(), purchase_id: null, qty: 0 }); },
     removeIngredientFromBread(bIndex, uIndex){ this.breads[bIndex].ingredients.splice(uIndex,1); },
 
-    // total used across all breads for a given purchase id
     totalUsedByPurchaseId(purchaseId){
       if (!purchaseId) return 0;
       let total = 0;
-      this.breads.forEach(b => {
-        b.ingredients.forEach(u => {
-          if (u.purchase_id === purchaseId) total += Number(u.qty) || 0;
-        });
-      });
+      this.breads.forEach(b => b.ingredients.forEach(u => { if (u.purchase_id === purchaseId) total += Number(u.qty) || 0; }));
       return Number(total);
     },
 
-    // remaining quantity for a purchase
     remainingFor(purchaseId){
       const p = this.purchases.find(x => x.id === purchaseId);
       if (!p) return 0;
@@ -253,16 +273,13 @@ function bakerInventory(){
       return rem < 0 ? 0 : rem;
     },
 
-    // calculate unit cost and usage cost
     calculateUsageCost(use){
       if (!use || !use.purchase_id) return '0.00';
       const p = this.purchases.find(x => x.id === use.purchase_id);
-      if (!p) return '0.00';
-      if (!p.qty || Number(p.qty) === 0) return '0.00';
+      if (!p || !p.qty || Number(p.qty) === 0) return '0.00';
       const unitCost = Number(p.cost) / Number(p.qty);
       const cost = (unitCost * Number(use.qty || 0));
-      if (!isFinite(cost)) return '0.00';
-      return Number(cost).toFixed(2);
+      return isFinite(cost) ? Number(cost).toFixed(2) : '0.00';
     },
 
     breadTotalCost(bread){
@@ -276,23 +293,46 @@ function bakerInventory(){
       return Number(total).toFixed(2);
     },
 
-    // validation before send
+    // ===== SUMMARY FUNCTIONS =====
+    totalPurchaseCost() {
+      const total = this.purchases.reduce((sum, p) => sum + (Number(p.cost) || 0), 0);
+      return Number(total).toFixed(2);
+    },
+
+    totalUsageCost() {
+      const total = this.breads.reduce((sum, b) => {
+        return sum + b.ingredients.reduce((s, u) => s + Number(this.calculateUsageCost(u) || 0), 0);
+      }, 0);
+      return Number(total).toFixed(2);
+    },
+
+    remainingStockValue() {
+      const total = this.purchases.reduce((sum, p) => {
+        const remainingQty = this.remainingFor(p.id);
+        const unitCost = p.qty ? Number(p.cost) / Number(p.qty) : 0;
+        return sum + (remainingQty * unitCost);
+      }, 0);
+      return Number(total).toFixed(2);
+    },
+
+    stockNote() {
+      const remaining = Number(this.remainingStockValue());
+      if (remaining === 0) return "All stock allocated";
+      return "Unused stock available";
+    },
+    // ===============================
+
     validate(){
-      // purchases validation
       for (const p of this.purchases){
         if (!p.name || p.name.trim() === '') return { ok:false, msg: 'All purchases must have an ingredient name.' };
         if (!p.qty || Number(p.qty) <= 0) return { ok:false, msg: `Quantity must be > 0 for "${p.name}".` };
         if (p.cost === '' || p.cost === null || Number(p.cost) < 0) return { ok:false, msg: `Enter a valid cost for "${p.name}".` };
       }
-      // usage validation
       for (const b of this.breads){
         if (!b.name || b.name.trim() === '') return { ok:false, msg: 'All breads must have a name.' };
         for (const u of b.ingredients){
           if (!u.purchase_id) return { ok:false, msg: `Select an ingredient for bread "${b.name}".` };
           if (!u.qty || Number(u.qty) <= 0) return { ok:false, msg: `Enter a qty used for ingredient in bread "${b.name}".` };
-          const rem = this.remainingFor(u.purchase_id);
-          // if the ingredient belongs to this bread, remaining excludes this element's own qty, so allow equality
-          // But to be strictly safe, compute available = p.qty - (totalUsedByPurchaseId - u.qty) and check u.qty <= available
           const totalUsed = this.totalUsedByPurchaseId(u.purchase_id);
           const p = this.purchases.find(x => x.id === u.purchase_id);
           if (p){
@@ -304,34 +344,13 @@ function bakerInventory(){
       return { ok:true };
     },
 
-    // send to backend
     sendInventory(){
       const v = this.validate();
-      if (!v.ok){
-        this.showToast(v.msg, 'error');
-        return;
-      }
-
-      const payload = {
-        seller_id: this.SELLER_ID,
-        purchases: this.purchases,
-        breads: this.breads.map(b => ({ name: b.name, ingredients: b.ingredients }))
-      };
-
-      fetch('/send-baker-inventory', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      })
+      if (!v.ok){ this.showToast(v.msg, 'error'); return; }
+      const payload = { seller_id: this.SELLER_ID, purchases: this.purchases, breads: this.breads.map(b => ({ name: b.name, ingredients: b.ingredients })) };
+      fetch('/send-baker-inventory', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       .then(res => res.json())
-      .then(json => {
-        if (json && json.success){
-          this.showToast('Inventory submitted to admin.', 'success');
-          // optionally keep data intact; you may want to clear or mark submitted state
-        } else {
-          this.showToast(json.error || 'Server error while submitting.', 'error');
-        }
-      })
+      .then(json => { if (json && json.success) this.showToast('Inventory submitted to admin.', 'success'); else this.showToast(json.error || 'Server error while submitting.', 'error'); })
       .catch(err => { console.error(err); this.showToast('Network error while submitting.', 'error'); });
     },
 
@@ -340,7 +359,6 @@ function bakerInventory(){
       setTimeout(()=> this.toast.show = false, 4000);
     },
 
-    // demo seed to quickly test UI
     seedExample(){
       this.purchases = [
         { id: this.nextId(), name: 'Flour', qty: 10, unit: 'kg', cost: 5000 },
@@ -352,6 +370,7 @@ function bakerInventory(){
   }
 }
 </script>
+
 
 </body>
 </html>
