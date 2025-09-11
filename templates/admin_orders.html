@@ -68,9 +68,10 @@
             <th>Identification Number</th>
             <th>Qty In Stock</th>
             <th>Quantity Sold</th>
-            <th>Sold Price ($)</th>
-            <th>Total Amount Sold ($)</th>
+            <th>Sold Price (₦)</th>
+            <th>Total Amount Sold (₦)</th>
             <th>Seller</th>
+            <th>Location</th>
             <th>Date Sold</th>
           </tr>
         </thead>
@@ -84,6 +85,7 @@
             <td>{{ order.selling_price | round(2) }}</td>
             <td>{{ order.amount | round(2) }}</td>
             <td>{{ order.seller.username }}</td>
+            <td>{{ order.location or "N/A" }}</td>
             <td>{% if order.date_sold %}{{ order.date_sold.strftime('%Y-%m-%d %H:%M:%S') }}{% else %}No Date Sold{% endif %}</td>
           </tr>
           {% else %}
@@ -104,7 +106,7 @@
       <button id="showTotalsBtn" class="px-4 py-2 rounded-md show-totals bg-green-600 text-white">Show Totals</button>
       <div id="totalsContainer" class="text-center" style="display:none;">
         <p><strong>Total Quantity Sold:</strong> <span id="totalQuantity">0</span></p>
-        <p><strong>Total Amount Made ($):</strong> $<span id="totalAmount">0.00</span></p>
+        <p><strong>Total Amount Made (₦):</strong> ₦<span id="totalAmount">0.00</span></p>
       </div>
     </div>
 

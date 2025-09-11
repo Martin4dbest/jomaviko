@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Baker Inventory — Admin View</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-b from-gray-50 to-gray-100 min-h-screen p-4 sm:p-8">
+
+  <div class="max-w-6xl mx-auto">
+    <!-- Header -->
+    <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+      <div>
+        <h1 class="text-2xl sm:text-3xl font-extrabold text-gray-800">📋 Baker Inventory Submissions</h1>
+        <p class="text-sm text-gray-500 mt-1">Review, approve, reject, or export inventory submissions sent by bakers.</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="{{ url_for('admin_dashboard') }}" class="inline-flex items-center px-3 py-2 rounded-md border hover:bg-gray-50">
+          ⬅ Back to Dashboard
+        </a>
+
+        <form action="{{ url_for('clear_inventories') }}" method="POST" onsubmit="return confirm('Are you sure you want to delete all inventories?');" class="inline-block">
+          <button type="submit" class="px-3 py-2 rounded-md border hover:bg-gray-50 text-sm">🗑️ Clear Inventories</button>
+        </form>
+
+        <button id="toggle-summary" class="px-3 py-2 rounded-md border hover:bg-gray-50 text-sm">📊 Show Bread Summary</button>
+        <button id="export-all" class="px-3 py-2 rounded-md border hover:bg-gray-50 text-sm">⬇ Export All CSV</button>
+      </div>
+    </header>
+
+    <!-- Flash (server-flashed) -->
+    <div id="flash-messages" class="space-y-2 mb-4">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="px-4 py-2 rounded shadow 
+              {% if category == 'success' %}bg-green-100 text-green-800{% else %}bg-red-100 text-red-800{% endif %}">
+              {{ message }}
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+    </div>
+
+    <!-- Hidden JSON payload from server -->
+    <div id="inventory-data" data-json='{{ inventory_list|tojson | safe }}' style="display:none;"></div>
+
+    <!-- Search / Filters -->
+    <div class="mb-4 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+      <div class="flex gap-2">
+        <input id="search-box" type="search" placeholder="Search seller or bread type..." class="p-2 border rounded-md w-64" />
+        <select id="status-filter" class="p-2 border rounded-md">
+          <option value="">All status</option>
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+        </select>
+      </div>
+      <div class="text-sm text-gray-500">Showing submissions — click a card to expand details or use actions on the right.</div>
+    </div>
+
+    <!-- Submissions container -->
+    <div id="submissions" class="space-y-4 mb-8">
+      <!-- JS will render submission cards here -->
+    </div>
+
+    <!-- Summary table (hidden by default) -->
+    <section id="summary-section" class="hidden bg-white p-4 rounded-xl shadow">
+      <h3 class="text-lg font-semibold mb-3">Bread Summary</h3>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm table-auto border-collapse">
+          <thead>
+            <tr class="bg-gray-800 text-white">
+              <th class="px-3 py-2 text-left">Bread Type</th>
+              <th class="px-3 py-2 text-center">Total Qty</th>
+              <th class="px-3 py-2 text-right">Total Cost (₦)</th>
+            </tr>
+          </thead>
+          <tbody id="summary-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+<script>
+(function () {
+  // Grab data provided by server
+  const rawData = document.getElementById('inventory-data')?.dataset?.json;
+  let inventoryData = [];
+  try { inventoryData = rawData ? JSON.parse(rawData) : []; } catch(e) { inventoryData = []; console.error('Invalid inventory JSON', e); }
+
+  // Helper: normalize and expand submissions into consistent internal structure:
+  // Each submission => { id, seller_name, date_sent, status, purchases:[], breads:[] }
+  // We'll derive display rows from this normalized submission object.
+  function normalizeSubmissions(list) {
+    return (list || []).map((s, idx) => {
+      const submission = {
+        id: s.id, 
+        seller_name: s.seller_name ?? (s.seller?.name) ?? s.seller_id ?? 'Unknown',
+        date_sent: s.date_sent ?? s.created_at ?? s.timestamp ?? '',
+        status: s.status ?? 'pending',
+        raw: s,
+        purchases: [],
+        breads: []
+      };
+
+      // If incoming shape already contains `ingredients` per submission (legacy)
+      // treat submission.ingredients as a flattened set where item.bread_type exists
+      if (Array.isArray(s.ingredients)) {
+        // there is no explicit purchases list here — create synthetic purchases entries by name
+        const purchaseMap = {};
+        s.ingredients.forEach(it => {
+          const pname = it.name || it.ingredient || 'Unnamed';
+          if (!purchaseMap[pname]) {
+            purchaseMap[pname] = { id: 'gen_' + pname, name: pname, unit: it.unit || '', qty: it.qty || 0, cost: (it.cost ?? 0) };
+          } else {
+            // accumulate qty and cost if multiple entries present
+            purchaseMap[pname].qty += Number(it.qty) || 0;
+            purchaseMap[pname].cost += Number(it.cost) || 0;
+          }
+        });
+        submission.purchases = Object.values(purchaseMap);
+        // Now convert each ingredient into breads structure
+        const breadsMap = {};
+        s.ingredients.forEach(it => {
+          const bt = it.bread_type || it.bread || 'General';
+          breadsMap[bt] = breadsMap[bt] || { name: bt, ingredients: [] };
+          breadsMap[bt].ingredients.push({
+            purchase_id: 'gen_' + (it.name || it.ingredient),
+            name: it.name || it.ingredient,
+            qty: Number(it.qty) || 0,
+            unit: it.unit || '',
+            cost: Number(it.cost) || 0
+          });
+        });
+        submission.breads = Object.values(breadsMap);
+      }
+      // If incoming shape contains purchases + breads (our baker UI)
+      else if (Array.isArray(s.purchases) || Array.isArray(s.breads)) {
+        submission.purchases = Array.isArray(s.purchases) ? s.purchases.map(p => ({
+          id: p.id ?? p._id ?? ('p_' + Math.random().toString(36).slice(2)),
+          name: p.name || p.ingredient || 'Unnamed',
+          qty: Number(p.qty || 0),
+          unit: p.unit || '',
+          cost: Number(p.cost || 0)
+        })) : [];
+
+        // breads may be [ { name, ingredients: [ { purchase_id, qty, name? } ] } ]
+        submission.breads = (Array.isArray(s.breads) ? s.breads : []).map(b => ({
+          name: b.name || b.bread_type || 'Unnamed bread',
+          ingredients: Array.isArray(b.ingredients) ? b.ingredients.map(it => ({
+            purchase_id: it.purchase_id ?? it.p_id ?? null,
+            name: it.name ?? null,
+            qty: Number(it.qty || 0),
+            unit: it.unit ?? null,
+            cost: Number(it.cost ?? 0)
+          })) : []
+        }));
+
+        // If purchases exist but ingredient entries reference purchase_id not exact match,
+        // attempt to coerce by name later in cost calculation.
+      } else {
+        // unknown shape — keep raw for debugging
+        submission.purchases = [];
+        submission.breads = [];
+      }
+
+      return submission;
+    });
+  }
+
+  // Render all submissions (cards)
+  function renderSubmissions(subs) {
+    const container = document.getElementById('submissions');
+    container.innerHTML = '';
+    if (!subs.length) {
+      container.innerHTML = `<div class="bg-white p-6 rounded-lg shadow text-center text-gray-600">No baker inventory submissions yet.</div>`;
+      return;
+    }
+
+    subs.forEach(sub => {
+      const card = document.createElement('div');
+      card.className = 'bg-white rounded-xl shadow p-4 sm:p-6';
+      // Header row: seller, date, status, actions
+      card.innerHTML = `
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+          <div>
+            <div class="text-sm text-gray-500">Seller</div>
+            <div class="text-lg font-semibold">${escapeHtml(sub.seller_name)}</div>
+            <div class="text-xs text-gray-400 mt-1">Sent: ${escapeHtml(sub.date_sent || '')}</div>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="text-sm px-3 py-1 rounded-full ${statusClass(sub.status)}">${escapeHtml(capitalize(sub.status || 'pending'))}</div>
+            <div class="flex gap-2">
+              <button class="approve-btn px-3 py-1 rounded-md border bg-green-50 text-green-700 text-sm">Approve</button>
+              <button class="reject-btn px-3 py-1 rounded-md border bg-red-50 text-red-700 text-sm">Reject</button>
+              <button class="export-btn px-3 py-1 rounded-md border bg-blue-50 text-blue-700 text-sm">Export CSV</button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Details area: purchases summary + breads tables
+      const details = document.createElement('div');
+      details.className = 'space-y-3';
+      // Purchases table
+      let purchasesHtml = '';
+      if (sub.purchases && sub.purchases.length) {
+        purchasesHtml += `
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm table-auto border-collapse mb-2">
+              <thead>
+                <tr class="bg-gray-100">
+                  <th class="px-2 py-1 text-left">Ingredient</th>
+                  <th class="px-2 py-1 text-center">Qty</th>
+                  <th class="px-2 py-1 text-center">Unit</th>
+                  <th class="px-2 py-1 text-right">Total Cost (₦)</th>
+                </tr>
+              </thead>
+              <tbody>
+        `;
+        sub.purchases.forEach(p => {
+          purchasesHtml += `
+            <tr class="border-b">
+              <td class="px-2 py-1">${escapeHtml(p.name)}</td>
+              <td class="px-2 py-1 text-center">${formatNumber(p.qty)}</td>
+              <td class="px-2 py-1 text-center">${escapeHtml(p.unit || '-')}</td>
+              <td class="px-2 py-1 text-right">${formatCurrency(p.cost)}</td>
+            </tr>
+          `;
+        });
+        purchasesHtml += `</tbody></table></div>`;
+      } else {
+        purchasesHtml += `<div class="text-xs text-gray-500">No purchase records supplied.</div>`;
+      }
+
+      // Breads (expand to rows)
+      let breadsHtml = '';
+      if (sub.breads && sub.breads.length) {
+        sub.breads.forEach(b => {
+          breadsHtml += `
+            <div class="border rounded-lg p-3 bg-gray-50">
+              <div class="flex items-center justify-between mb-2">
+                <div class="font-semibold">${escapeHtml(b.name)}</div>
+                <div class="text-sm text-gray-500">Bread total: <span class="font-medium">${formatCurrency(computeBreadTotal(sub, b))}</span></div>
+              </div>
+              <div class="overflow-x-auto">
+                <table class="w-full text-sm table-auto border-collapse">
+                  <thead>
+                    <tr class="bg-white text-left">
+                      <th class="px-2 py-1">Ingredient</th>
+                      <th class="px-2 py-1 text-center">Qty Used</th>
+                      <th class="px-2 py-1 text-center">Unit</th>
+                      <th class="px-2 py-1 text-right">Cost/unit (₦)</th>
+                      <th class="px-2 py-1 text-right">Total (₦)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+          `;
+          if (Array.isArray(b.ingredients) && b.ingredients.length) {
+            b.ingredients.forEach(u => {
+              const resolved = resolveIngredientFromPurchase(sub, u);
+              breadsHtml += `
+                <tr class="border-b">
+                  <td class="px-2 py-1">${escapeHtml(resolved.name)}</td>
+                  <td class="px-2 py-1 text-center">${formatNumber(u.qty)}</td>
+                  <td class="px-2 py-1 text-center">${escapeHtml(resolved.unit || '-')}</td>
+                  <td class="px-2 py-1 text-right">${formatCurrency(resolved.costPerUnit)}</td>
+                  <td class="px-2 py-1 text-right">${formatCurrency(resolved.totalCost)}</td>
+                </tr>
+              `;
+            });
+          } else {
+            breadsHtml += `<tr><td colspan="5" class="px-2 py-3 text-xs text-gray-500">No ingredients for this bread.</td></tr>`;
+          }
+          breadsHtml += `</tbody></table></div></div>`;
+        });
+      } else {
+        breadsHtml += `<div class="text-xs text-gray-500">No bread usage records.</div>`;
+      }
+
+      details.innerHTML = purchasesHtml + breadsHtml;
+      card.appendChild(details);
+
+      // Footer with small info and a toggle for details collapse
+      const footer = document.createElement('div');
+      footer.className = 'mt-3 flex items-center justify-between text-xs text-gray-500';
+      footer.innerHTML = `
+        <div>Submission ID: <span class="font-mono">${escapeHtml(sub.id)}</span></div>
+        <div class="flex items-center gap-2">
+          <button class="toggle-details px-2 py-1 rounded-md border text-xs">Toggle Details</button>
+        </div>
+      `;
+      card.appendChild(footer);
+
+      // Append and wire up actions
+      container.appendChild(card);
+
+      // wire buttons for this card
+      const approveBtn = card.querySelector('.approve-btn');
+      const rejectBtn = card.querySelector('.reject-btn');
+      const exportBtn = card.querySelector('.export-btn');
+      const toggleDetails = card.querySelector('.toggle-details');
+
+      approveBtn?.addEventListener('click', () => handleAction(sub, 'approve', card));
+      rejectBtn?.addEventListener('click', () => handleAction(sub, 'reject', card));
+      exportBtn?.addEventListener('click', () => exportSubmissionCSV(sub));
+      toggleDetails?.addEventListener('click', () => {
+        const d = details;
+        if (d.style.display === 'none') { d.style.display = ''; } else { d.style.display = 'none'; }
+      });
+    });
+  }
+
+  // Resolve ingredient names/unit/cost using purchase info if available; compute costPerUnit and totalCost
+  function resolveIngredientFromPurchase(submission, usage) {
+    // usage: { purchase_id, name?, qty, unit?, cost? }
+    let name = usage.name || 'Unnamed';
+    let unit = usage.unit || '';
+    let costPerUnit = 0;
+    let totalCost = 0;
+
+    // Try to find purchase by id or by name
+    let purchase = null;
+    if (usage.purchase_id && submission.purchases) {
+      purchase = submission.purchases.find(p => String(p.id) === String(usage.purchase_id) || String(p.id) === String(usage.purchase_id));
+    }
+    if (!purchase && submission.purchases && usage.name) {
+      purchase = submission.purchases.find(p => (p.name || '').toLowerCase() === String(usage.name).toLowerCase());
+    }
+
+    if (purchase) {
+      name = purchase.name || name;
+      unit = purchase.unit || unit || '';
+      // compute cost per unit if possible
+      if (purchase.qty && Number(purchase.qty) > 0) {
+        costPerUnit = Number(purchase.cost || 0) / Number(purchase.qty);
+      } else {
+        // fallback to provided usage.cost or zero
+        costPerUnit = Number(usage.cost || 0);
+      }
+    } else {
+      // no matching purchase, fallback to usage.cost or 0
+      costPerUnit = Number(usage.cost || 0);
+    }
+
+    totalCost = costPerUnit * Number(usage.qty || 0);
+
+    return {
+      name: name,
+      unit: unit,
+      costPerUnit: Number.isFinite(costPerUnit) ? Number(costPerUnit).toFixed(2) : '0.00',
+      totalCost: Number.isFinite(totalCost) ? Number(totalCost).toFixed(2) : '0.00'
+    };
+  }
+
+  // compute total cost for a bread
+  function computeBreadTotal(submission, bread) {
+    if (!bread || !bread.ingredients) return 0;
+    let tot = 0;
+    bread.ingredients.forEach(u => {
+      const r = resolveIngredientFromPurchase(submission, u);
+      tot += Number(r.totalCost || 0);
+    });
+    return tot;
+  }
+
+  // Utility: format
+  function formatCurrency(v) {
+    const n = Number(v || 0);
+    return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  function formatNumber(v) {
+    return Number(v || 0).toLocaleString();
+  }
+  function escapeHtml(unsafe) {
+    if (unsafe === null || unsafe === undefined) return '';
+    return String(unsafe)
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
+  function capitalize(s) { return String(s || '').charAt(0).toUpperCase() + String(s || '').slice(1); }
+  function statusClass(status) {
+    status = (status || '').toLowerCase();
+    if (status === 'approved') return 'bg-green-100 text-green-800';
+    if (status === 'rejected') return 'bg-red-100 text-red-800';
+    return 'bg-yellow-100 text-yellow-800';
+  }
+
+  // Actions: Approve / Reject
+  function handleAction(submission, action, cardEl) {
+    if (!confirm(`Are you sure you want to ${action} this submission from "${submission.seller_name}"?`)) return;
+    // POST to server endpoint (adjust URL to match your backend routes)
+    const url = action === 'approve' ? '/admin/approve_inventory' : '/admin/reject_inventory';
+    fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ submission_id: submission.id })
+    })
+    .then(r => r.json())
+    .then(json => {
+      if (json && json.success) {
+        alert(`${capitalize(action)}d successfully.`);
+        // visually update status without reload
+        const statusEl = cardEl.querySelector('div > .text-sm.px-3.py-1.rounded-full');
+        if (statusEl) {
+          statusEl.textContent = capitalize(action === 'approve' ? 'approved' : 'rejected');
+          statusEl.className = 'text-sm px-3 py-1 rounded-full ' + (action === 'approve' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800');
+        }
+      } else {
+        alert(json.error || 'Server error');
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      alert('Network/server error while performing action.');
+    });
+  }
+
+  // Export CSV for one submission
+  function exportSubmissionCSV(sub) {
+    // Build rows: bread, ingredient, unit, qty, costPerUnit, total
+    const rows = [['Seller','Submission ID','Date Sent','Bread Type','Ingredient','Unit','Qty Used','Cost/unit (₦)','Total (₦)']];
+    (sub.breads || []).forEach(b => {
+      (b.ingredients || []).forEach(u => {
+        const r = resolveIngredientFromPurchase(sub, u);
+        rows.push([ sub.seller_name, sub.id, sub.date_sent || '', b.name, r.name, r.unit, u.qty, r.costPerUnit, r.totalCost ]);
+      });
+    });
+
+    downloadCSV(rows, `submission_${sub.id}.csv`);
+  }
+
+  // Export CSV for all submissions
+  function exportAllCSV(submissions) {
+    const rows = [['Seller','Submission ID','Date Sent','Bread Type','Ingredient','Unit','Qty Used','Cost/unit (₦)','Total (₦)']];
+    submissions.forEach(sub => {
+      (sub.breads || []).forEach(b => {
+        (b.ingredients || []).forEach(u => {
+          const r = resolveIngredientFromPurchase(sub, u);
+          rows.push([ sub.seller_name, sub.id, sub.date_sent || '', b.name, r.name, r.unit, u.qty, r.costPerUnit, r.totalCost ]);
+        });
+      });
+    });
+    downloadCSV(rows, `all_submissions_${(new Date()).toISOString().slice(0,10)}.csv`);
+  }
+
+  function downloadCSV(rows, filename = 'export.csv') {
+    const csv = rows.map(r => r.map(cell => `"${String(cell||'').replaceAll('"','""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  // Build summary by bread type
+  function buildSummary(submissions) {
+    const totals = {};
+    submissions.forEach(sub => {
+      (sub.breads || []).forEach(b => {
+        const breadName = b.name || 'Unnamed';
+        totals[breadName] = totals[breadName] || { quantity: 0, cost: 0 };
+        (b.ingredients || []).forEach(u => {
+          const r = resolveIngredientFromPurchase(sub, u);
+          totals[breadName].quantity += Number(u.qty || 0);
+          totals[breadName].cost += Number(r.totalCost || 0);
+        });
+      });
+    });
+    return totals;
+  }
+
+  // Render summary table
+  function renderSummary(submissions) {
+    const totals = buildSummary(submissions);
+    const body = document.getElementById('summary-body');
+    body.innerHTML = '';
+    if (!Object.keys(totals).length) {
+      body.innerHTML = `<tr><td colspan="3" class="px-3 py-2 text-xs text-gray-500">No bread entries to summarize.</td></tr>`;
+      return;
+    }
+    Object.keys(totals).forEach(b => {
+      const tr = document.createElement('tr');
+      tr.className = 'border-b';
+      tr.innerHTML = `
+        <td class="px-3 py-2">${escapeHtml(b)}</td>
+        <td class="px-3 py-2 text-center">${formatNumber(totals[b].quantity)}</td>
+        <td class="px-3 py-2 text-right">${formatCurrency(totals[b].cost)}</td>
+      `;
+      body.appendChild(tr);
+    });
+  }
+
+  // Wire up toggle & export all
+  document.getElementById('toggle-summary').addEventListener('click', () => {
+    const sec = document.getElementById('summary-section');
+    if (sec.classList.contains('hidden')) {
+      renderSummary(normalized);
+      sec.classList.remove('hidden');
+      document.getElementById('toggle-summary').textContent = '📊 Hide Bread Summary';
+      window.scrollTo({ top: sec.offsetTop - 20, behavior: 'smooth' });
+    } else {
+      sec.classList.add('hidden');
+      document.getElementById('toggle-summary').textContent = '📊 Show Bread Summary';
+    }
+  });
+
+  document.getElementById('export-all').addEventListener('click', () => {
+    exportAllCSV(normalized);
+  });
+
+  // Search/filter interactions
+  document.getElementById('search-box').addEventListener('input', e => {
+    applyFilters();
+  });
+  document.getElementById('status-filter').addEventListener('change', e => {
+    applyFilters();
+  });
+
+  function applyFilters() {
+    const q = document.getElementById('search-box').value.trim().toLowerCase();
+    const status = document.getElementById('status-filter').value;
+    const filtered = normalized.filter(s => {
+      const matchStatus = status ? (s.status || '').toLowerCase() === status : true;
+      const matchQ = q ? ((s.seller_name || '').toLowerCase().includes(q) || (s.breads || []).some(b => (b.name || '').toLowerCase().includes(q))) : true;
+      return matchStatus && matchQ;
+    });
+    renderSubmissions(filtered);
+  }
+
+  // CSV export and approve/reject return fetch POST to backend endpoints — adjust these URLs to your real endpoints
+  // normalize initial data & render
+  const normalized = normalizeSubmissions(inventoryData || []);
+  renderSubmissions(normalized);
+
+  // Auto-hide flash messages (existing server flashes)
+  setTimeout(() => {
+    const container = document.getElementById('flash-messages');
+    if (container) container.style.display = 'none';
+  }, 3500);
+
+})();
+</script>
+</body>
+</html>

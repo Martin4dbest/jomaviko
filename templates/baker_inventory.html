@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Baker Inventory — Purchases & Usage</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-gradient-to-b from-amber-50 to-orange-50 min-h-screen p-4 sm:p-6" x-data="bakerInventory()">
+  <!-- Header -->
+
+  <!-- Back to Dashboard (Top of Page) -->
+  <div class="max-w-4xl mx-auto mb-6 text-left">
+    <a href="/seller_dashboard" class="px-2 py-1 border rounded">← Back to Dashboard</a>
+  </div>
+
+
+  <header class="max-w-4xl mx-auto mb-6 text-center">
+    <h1 class="text-3xl sm:text-4xl font-extrabold text-orange-700">🥖 Baker Inventory</h1>
+    <p class="text-gray-600 mt-2">Record purchases, allocate ingredients to bread types and submit to admin.</p>
+  </header>
+
+  <main class="max-w-4xl mx-auto space-y-8">
+
+    <!-- Purchases card -->
+    <section class="bg-white rounded-2xl shadow p-4 sm:p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg sm:text-xl font-semibold text-gray-800">📦 Ingredient Purchases (Stock-in)</h2>
+        <div class="text-sm text-gray-500">Track quantity, unit and total cost</div>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm border-collapse">
+          <thead>
+            <tr class="bg-orange-600 text-white rounded-tl-md">
+              <th class="px-3 py-2 text-left">Ingredient</th>
+              <th class="px-3 py-2 text-center">Qty</th>
+              <th class="px-3 py-2 text-center">Unit</th>
+              <th class="px-3 py-2 text-center">Total Cost (₦)</th>
+              <th class="px-3 py-2 text-center">Remaining</th>
+              <th class="px-3 py-2 text-center">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <template x-for="(p, i) in purchases" :key="p.id">
+              <tr :class="{'opacity-60 bg-red-50': remainingFor(p.id) <= 0}" class="border-b">
+                <td class="px-2 py-2">
+                  <input
+                    x-model="p.name"
+                    type="text"
+                    placeholder="e.g. Flour"
+                    class="w-full sm:w-56 p-2 border rounded-lg focus:ring-2 focus:ring-orange-300"
+                    aria-label="Ingredient name"
+                  />
+                </td>
+                <td class="px-2 py-2 text-center">
+                  <input x-model.number="p.qty" type="number" min="0" class="w-20 p-2 border rounded-lg text-center" aria-label="Quantity bought" />
+                </td>
+                <td class="px-2 py-2 text-center">
+                  <input x-model="p.unit" type="text" placeholder="kg/L/pcs" class="w-20 p-2 border rounded-lg text-center" aria-label="Unit" />
+                </td>
+                <td class="px-2 py-2 text-center">
+                  <input x-model.number="p.cost" type="number" min="0" step="0.01" class="w-28 p-2 border rounded-lg text-center" aria-label="Total cost" />
+                </td>
+                <td class="px-2 py-2 text-center">
+                  <div class="flex flex-col items-center">
+                    <div class="text-sm font-semibold"> <span x-text="remainingFor(p.id)"></span> <span class="text-xs text-gray-500" x-text="p.unit"></span></div>
+                    <div class="text-xs mt-1">
+                      <span x-show="remainingFor(p.id) <= 0" class="inline-block bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Used up</span>
+                      <span x-show="remainingFor(p.id) > 0" class="inline-block bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Available</span>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-2 py-2 text-center">
+                  <div class="flex items-center justify-center gap-2">
+                    <button @click="removePurchase(i)" class="text-red-600 hover:text-red-800 px-2 py-1 rounded" aria-label="Remove purchase">✖</button>
+                  </div>
+                </td>
+              </tr>
+            </template>
+
+            <tr x-show="purchases.length === 0">
+              <td colspan="6" class="text-center py-6 text-gray-500">No purchases yet. Tap "Add Purchase" to start.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div class="flex gap-2">
+          <button @click="addPurchase()" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg shadow">➕ Add Purchase</button>
+          <button @click="seedExample()" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg">Example</button>
+        </div>
+        <div class="text-xs text-gray-500">Tip: Enter the total cost you paid for the whole quantity (not cost per unit).</div>
+      </div>
+    </section>
+
+    <!-- Usage per bread card -->
+    <section class="bg-white rounded-2xl shadow p-4 sm:p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg sm:text-xl font-semibold text-gray-800">🍞 Ingredient Usage Per Bread Type (Stock-out)</h2>
+        <div class="text-sm text-gray-500">Pick purchased ingredients and enter qty used</div>
+      </div>
+
+      <template x-for="(bread, bi) in breads" :key="bread.id">
+        <div class="mb-4 border border-gray-100 rounded-xl p-3 bg-gradient-to-r from-white to-orange-50">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-3">
+            <input x-model="bread.name" type="text" placeholder="Bread type (e.g. Butter Loaf)" class="flex-1 p-2 border rounded-lg font-semibold" />
+            <div class="flex items-center gap-2">
+              <button @click="addIngredientToBread(bi)" class="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg">➕ Add Ingredient</button>
+              <button @click="removeBread(bi)" class="text-red-700 px-3 py-2">❌ Remove</button>
+            </div>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-sm border-collapse">
+              <thead>
+                <tr class="bg-gray-700 text-white">
+                  <th class="px-3 py-2 text-left">Ingredient</th>
+                  <th class="px-3 py-2 text-center">Qty Used</th>
+                  <th class="px-3 py-2 text-center">Unit</th>
+                  <th class="px-3 py-2 text-center">Cost (₦)</th>
+                  <th class="px-3 py-2 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="(use, ui) in bread.ingredients" :key="use.id">
+                  <tr class="border-b hover:bg-gray-50">
+                    <td class="px-2 py-2">
+                      <select x-model.number="use.purchase_id" class="w-full sm:w-48 p-2 border rounded-lg" aria-label="Select ingredient">
+                        <option :value="null">-- Select Purchased Ingredient --</option>
+                        <template x-for="p in purchases" :key="p.id">
+                          <option :value="p.id" :disabled="remainingFor(p.id) <= 0" x-text="(p.name || 'Untitled') + (remainingFor(p.id) <= 0 ? ' (Used up)' : '')"></option>
+                        </template>
+                      </select>
+                      <div class="text-xs text-gray-500 mt-1" x-show="use.purchase_id">
+                        Remaining: <span class="font-semibold" x-text="remainingFor(use.purchase_id)"></span>
+                        <span class="text-gray-400"> / </span>
+                        <span class="text-gray-600" x-text="(purchases.find(pp=>pp.id===use.purchase_id) || {}).unit"></span>
+                      </div>
+                    </td>
+
+                    <td class="px-2 py-2 text-center">
+                      <input type="number" x-model.number="use.qty" min="0" class="w-24 p-2 border rounded-lg text-center"
+                        :max="remainingFor(use.purchase_id)"
+                        @input="if (use.purchase_id && use.qty > remainingFor(use.purchase_id)) use.qty = remainingFor(use.purchase_id)"
+                        aria-label="Quantity used" />
+                    </td>
+
+                    <td class="px-2 py-2 text-center">
+                      <div class="text-center text-sm text-gray-700" x-text="(purchases.find(pp=>pp.id===use.purchase_id) || {}).unit || '-' "></div>
+                    </td>
+
+                    <td class="px-2 py-2 text-center">
+                      <input type="text" :value="calculateUsageCost(use)" class="w-28 p-2 border rounded-lg bg-gray-100 text-center font-medium" readonly />
+                    </td>
+
+                    <td class="px-2 py-2 text-center">
+                      <div class="flex items-center justify-center gap-2">
+                        <button @click="removeIngredientFromBread(bi, ui)" class="text-red-600">✖</button>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+
+                <tr x-show="bread.ingredients.length === 0">
+                  <td colspan="5" class="text-center py-4 text-gray-500">No ingredients yet for this bread. Add one to start.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="mt-3 text-right font-semibold">
+            Bread Total: ₦ <span x-text="breadTotalCost(bread)"></span>
+          </div>
+        </div>
+      </template>
+
+      <div class="mt-4 text-center">
+        <button @click="addBread()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold">➕ Add Bread Type</button>
+      </div>
+
+      <div class="mt-6 bg-gray-50 border rounded-lg p-3 text-right">
+        <div class="text-sm text-gray-600">Grand Total (all breads)</div>
+        <div class="text-xl font-bold text-orange-700">₦ <span x-text="grandTotal()"></span></div>
+      </div>
+    </section>
+
+    <!-- Submit -->
+    <section class="text-center">
+      <div class="max-w-md mx-auto">
+        <button @click="sendInventory()" class="w-full bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-red-700 text-white px-6 py-3 rounded-2xl font-bold text-lg shadow-lg">✅ Submit Inventory to Admin</button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Toasts / Alerts -->
+  <div class="fixed bottom-6 right-6 z-50">
+    <template x-if="toast.show">
+      <div :class="toast.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'" class="px-4 py-3 rounded-lg shadow">
+        <div class="font-medium" x-text="toast.message"></div>
+      </div>
+    </template>
+  </div>
+
+<script>
+function bakerInventory(){
+  return {
+    // seller id injected from backend
+    SELLER_ID: JSON.parse('{{ seller_details.id | tojson | safe }}'),
+
+    purchases: [],
+    breads: [],
+    toast: { show: false, type: 'success', message: '' },
+
+    // generate unique id for local items
+    nextId(){ return Date.now() + Math.floor(Math.random()*1000); },
+
+    addPurchase(){
+      this.purchases.push({ id: this.nextId(), name: '', qty: 0, unit: 'kg', cost: 0 });
+    },
+    removePurchase(index){
+      const removed = this.purchases.splice(index,1);
+      // remove references from breads if any ingredients pointed to this purchase
+      this.breads.forEach(b=> b.ingredients.forEach(u=> { if (u.purchase_id === removed[0]?.id) u.purchase_id = null; }));
+    },
+
+    addBread(){ this.breads.push({ id: this.nextId(), name: '', ingredients: [] }); },
+    removeBread(index){ this.breads.splice(index,1); },
+
+    addIngredientToBread(bIndex){ this.breads[bIndex].ingredients.push({ id: this.nextId(), purchase_id: null, qty: 0 }); },
+    removeIngredientFromBread(bIndex, uIndex){ this.breads[bIndex].ingredients.splice(uIndex,1); },
+
+    // total used across all breads for a given purchase id
+    totalUsedByPurchaseId(purchaseId){
+      if (!purchaseId) return 0;
+      let total = 0;
+      this.breads.forEach(b => {
+        b.ingredients.forEach(u => {
+          if (u.purchase_id === purchaseId) total += Number(u.qty) || 0;
+        });
+      });
+      return Number(total);
+    },
+
+    // remaining quantity for a purchase
+    remainingFor(purchaseId){
+      const p = this.purchases.find(x => x.id === purchaseId);
+      if (!p) return 0;
+      const rem = (Number(p.qty) || 0) - this.totalUsedByPurchaseId(purchaseId);
+      return rem < 0 ? 0 : rem;
+    },
+
+    // calculate unit cost and usage cost
+    calculateUsageCost(use){
+      if (!use || !use.purchase_id) return '0.00';
+      const p = this.purchases.find(x => x.id === use.purchase_id);
+      if (!p) return '0.00';
+      if (!p.qty || Number(p.qty) === 0) return '0.00';
+      const unitCost = Number(p.cost) / Number(p.qty);
+      const cost = (unitCost * Number(use.qty || 0));
+      if (!isFinite(cost)) return '0.00';
+      return Number(cost).toFixed(2);
+    },
+
+    breadTotalCost(bread){
+      if (!bread || !bread.ingredients) return '0.00';
+      const total = bread.ingredients.reduce((s,u)=> s + Number(this.calculateUsageCost(u) || 0), 0);
+      return Number(total).toFixed(2);
+    },
+
+    grandTotal(){
+      const total = this.breads.reduce((s,b)=> s + Number(this.breadTotalCost(b) || 0), 0);
+      return Number(total).toFixed(2);
+    },
+
+    // validation before send
+    validate(){
+      // purchases validation
+      for (const p of this.purchases){
+        if (!p.name || p.name.trim() === '') return { ok:false, msg: 'All purchases must have an ingredient name.' };
+        if (!p.qty || Number(p.qty) <= 0) return { ok:false, msg: `Quantity must be > 0 for "${p.name}".` };
+        if (p.cost === '' || p.cost === null || Number(p.cost) < 0) return { ok:false, msg: `Enter a valid cost for "${p.name}".` };
+      }
+      // usage validation
+      for (const b of this.breads){
+        if (!b.name || b.name.trim() === '') return { ok:false, msg: 'All breads must have a name.' };
+        for (const u of b.ingredients){
+          if (!u.purchase_id) return { ok:false, msg: `Select an ingredient for bread "${b.name}".` };
+          if (!u.qty || Number(u.qty) <= 0) return { ok:false, msg: `Enter a qty used for ingredient in bread "${b.name}".` };
+          const rem = this.remainingFor(u.purchase_id);
+          // if the ingredient belongs to this bread, remaining excludes this element's own qty, so allow equality
+          // But to be strictly safe, compute available = p.qty - (totalUsedByPurchaseId - u.qty) and check u.qty <= available
+          const totalUsed = this.totalUsedByPurchaseId(u.purchase_id);
+          const p = this.purchases.find(x => x.id === u.purchase_id);
+          if (p){
+            const available = Number(p.qty) - (Number(totalUsed) - Number(u.qty || 0));
+            if (Number(u.qty) > Number(available)) return { ok:false, msg: `Not enough "${p.name}" available for bread "${b.name}". Remaining: ${available} ${p.unit}` };
+          }
+        }
+      }
+      return { ok:true };
+    },
+
+    // send to backend
+    sendInventory(){
+      const v = this.validate();
+      if (!v.ok){
+        this.showToast(v.msg, 'error');
+        return;
+      }
+
+      const payload = {
+        seller_id: this.SELLER_ID,
+        purchases: this.purchases,
+        breads: this.breads.map(b => ({ name: b.name, ingredients: b.ingredients }))
+      };
+
+      fetch('/send-baker-inventory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      .then(res => res.json())
+      .then(json => {
+        if (json && json.success){
+          this.showToast('Inventory submitted to admin.', 'success');
+          // optionally keep data intact; you may want to clear or mark submitted state
+        } else {
+          this.showToast(json.error || 'Server error while submitting.', 'error');
+        }
+      })
+      .catch(err => { console.error(err); this.showToast('Network error while submitting.', 'error'); });
+    },
+
+    showToast(message, type = 'success'){
+      this.toast.show = true; this.toast.message = message; this.toast.type = type;
+      setTimeout(()=> this.toast.show = false, 4000);
+    },
+
+    // demo seed to quickly test UI
+    seedExample(){
+      this.purchases = [
+        { id: this.nextId(), name: 'Flour', qty: 10, unit: 'kg', cost: 5000 },
+        { id: this.nextId(), name: 'Sugar', qty: 5, unit: 'kg', cost: 2000 },
+        { id: this.nextId(), name: 'Yeast', qty: 1, unit: 'kg', cost: 800 },
+      ];
+      this.breads = [];
+    }
+  }
+}
+</script>
+
+</body>
+</html>

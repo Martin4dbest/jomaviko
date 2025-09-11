@@ -1,41 +1,35 @@
 <!DOCTYPE html>
-<html lang="en" x-data="chatApp()" x-init="init()" :class="{'bg-black': dark}">
+<html lang="en" x-data="chatApp()" x-init="init()">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Chat — {{ target_user.username }}</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
   <style>
-    /* Small scrollbar styling for chat box */
     .chat-scroll::-webkit-scrollbar { width: 10px; }
-    .chat-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 999px; }
+    .chat-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,.2); border-radius: 999px; }
     .msg-bubble { max-width: 78%; }
-    .date-sep { font-size: 0.8rem; }
+    .date-sep { font-size: .8rem; }
   </style>
 </head>
 <body class="min-h-screen bg-gray-100 text-gray-900">
   <div class="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8">
-
     <!-- Header -->
     <header class="flex items-center justify-between gap-4 mb-4">
       <div class="flex items-center gap-3">
-        <a href="{{ url_for('view_users') }}" class="inline-flex items-center text-sm text-gray-600 hover:text-gray-800">
-          ← Back
-        </a>
+        <a href="{{ url_for('chat') }}" class="inline-flex items-center text-sm text-gray-600 hover:text-gray-800">← Back</a>
         <div class="w-12 h-12 rounded-full bg-gray-300 overflow-hidden flex items-center justify-center">
           {% if target_user.avatar_url %}
-            <img src="{{ target_user.avatar_url }}" alt="{{ target_user.username }}" class="w-full h-full object-cover" />
+            <img src="{{ target_user.avatar_url }}" alt="{{ target_user.username }}" class="w-full h-full object-cover"/>
           {% else %}
             <span class="text-xl font-semibold text-gray-700">{{ target_user.username[0]|upper }}</span>
           {% endif %}
         </div>
         <div>
           <div class="font-semibold text-lg">{{ target_user.username }}</div>
-          <div class="text-xs text-gray-500">{{ target_user.location or 'Unknown location' }} • <span x-text="onlineStatus"></span></div>
         </div>
       </div>
-
       <div class="flex items-center gap-2">
         <button @click="clearChatConfirm" class="px-3 py-2 rounded-md bg-red-600 text-white text-sm hover:bg-red-700">Clear Chat</button>
         <button @click="exportChat" class="px-3 py-2 rounded-md bg-blue-600 text-white text-sm hover:bg-blue-700">Export</button>
@@ -44,50 +38,29 @@
 
     <!-- Chat area -->
     <main class="bg-white rounded-2xl shadow p-4 flex flex-col h-[72vh]">
-
-      <!-- messages list -->
-      <div id="chatBox" class="flex-1 overflow-auto mb-3 chat-scroll" x-ref="box" @scroll="onScroll()">
-        <template x-for="(group, idx) in groupedMessages" :key="group.id">
+      <div id="chatBox" class="flex-1 overflow-auto mb-3 chat-scroll" x-ref="box" @scroll="onScroll">
+        <template x-for="group in groupedMessages" :key="group.key">
           <div>
-            <!-- Date separator -->
             <div class="flex items-center justify-center my-4">
-              <div class="px-3 py-1 rounded-full bg-gray-100 text-gray-500 date-sep" x-text="group.date"></div>
+              <div class="px-3 py-1 rounded-full bg-gray-100 text-gray-500 date-sep" x-text="group.dateLabel"></div>
             </div>
-
-            <!-- messages in group -->
-            <template x-for="msg in group.messages" :key="msg.id">
+            <template x-for="msg in group.items" :key="msg.id">
               <div class="flex items-end gap-3 mb-3" :class="msg.isMe ? 'justify-end' : 'justify-start'">
-
-                <!-- avatar (left side for incoming) -->
                 <template x-if="!msg.isMe">
                   <div class="w-9 h-9 rounded-full bg-gray-200 flex items-center justify-center text-sm flex-shrink-0">
-                    <img x-show="msg.sender_avatar" :src="msg.sender_avatar" class="w-full h-full object-cover rounded-full" />
+                    <img x-show="msg.sender_avatar" :src="msg.sender_avatar" class="w-full h-full object-cover rounded-full"/>
                     <span x-show="!msg.sender_avatar" x-text="msg.sender_initial"></span>
                   </div>
                 </template>
-
-                <!-- bubble -->
-                <div class="relative msg-bubble">
+                <div class="relative msg-bubble group">
                   <div :class="msg.isMe ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-900'" class="px-4 py-2 rounded-2xl shadow-sm break-words">
                     <div class="text-sm" x-html="msg.content_html"></div>
-                    <div class="text-[11px] text-gray-400 mt-1 flex items-center gap-2">
+                    <div class="text-[11px] mt-1 flex items-center gap-2" :class="msg.isMe ? 'text-emerald-100' : 'text-gray-400'">
                       <span x-text="formatTime(msg.timestamp)"></span>
                       <span x-show="msg.edited" class="italic">(edited)</span>
-                      <template x-if="msg.isMe">
-                        <svg x-show="msg.status === 'sending'" xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 animate-spin text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v4m0 8v4m8-8h-4M4 12H8"/></svg>
-                        <svg x-show="msg.status === 'sent'" xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 text-white" viewBox="0 0 24 24"><path fill="currentColor" d="M20.285 6.708l-11.02 11.02-5.57-5.57L5.7 10.854l3.565 3.564L18.44 5.244z"/></svg>
-                      </template>
                     </div>
                   </div>
-
-                  <!-- small action menu for own messages (hover) -->
-                  <div class="absolute -bottom-6 right-0 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity" x-show="msg.isMe">
-                    <button @click="startEdit(msg)" class="text-xs text-gray-500 hover:text-gray-700">Edit</button>
-                    <button @click="confirmDelete(msg)" class="text-xs text-red-500 hover:text-red-700">Delete</button>
-                  </div>
                 </div>
-
-                <!-- avatar placeholder for outgoing (right) -->
                 <template x-if="msg.isMe">
                   <div class="w-9 h-9 rounded-full bg-green-600 flex items-center justify-center text-white text-sm">You</div>
                 </template>
@@ -96,152 +69,179 @@
           </div>
         </template>
 
-        <!-- New messages indicator when scrolled up -->
-        <div x-show="newCount > 0" class="fixed bottom-24 left-1/2 -translate-x-1/2 z-50">
-          <button @click="jumpToBottom()" class="px-4 py-2 rounded-full bg-amber-500 text-white">Jump to new messages ( <span x-text="newCount"></span> )</button>
+        <div x-show="newCount>0" class="fixed bottom-24 left-1/2 -translate-x-1/2 z-50">
+          <button @click="jumpToBottom" class="px-4 py-2 rounded-full bg-amber-500 text-white">
+            Jump to new messages ( <span x-text="newCount"></span> )
+          </button>
         </div>
       </div>
 
-      <!-- typing indicator + input -->
       <div class="mt-2">
-        <div class="flex items-center gap-3 mb-2">
-          <div x-show="typing" class="text-xs text-gray-500 italic">{{ target_user.username }} is typing…</div>
-        </div>
-
         <form @submit.prevent="sendMessage" class="flex items-end gap-3">
-          <textarea x-ref="input" x-model="draft" @keydown.enter.prevent="onEnter($event)" @input.debounce.300ms="notifyTyping()" rows="1" placeholder="Write a message — Shift+Enter for newline" class="flex-1 px-4 py-2 rounded-xl border resize-none focus:outline-none focus:ring-2 focus:ring-emerald-400"></textarea>
+          <textarea x-ref="input" x-model="draft" @keydown.enter.prevent="onEnter($event)"
+                    rows="1" placeholder="Write a message — Shift+Enter for newline"
+                    class="flex-1 px-4 py-2 rounded-xl border resize-none focus:outline-none focus:ring-2 focus:ring-emerald-400"></textarea>
           <button type="button" @click="attachFile" class="px-3 py-2 rounded-xl border">📎</button>
           <button type="submit" class="px-4 py-2 rounded-xl bg-emerald-600 text-white">Send</button>
         </form>
       </div>
-
     </main>
-
   </div>
-<!-- Server-injected JSON (safe to edit in VSCode) -->
-<script id="initial-data" type="application/json">
-{{ {
-  'messages': messages,
-  'current_user_id': current_user.id,
-  'target_user_id': target_user.id,
-  'urls': {
-    'send_message': url_for('send_message', user_id=target_user.id),
-    'get_messages': url_for('get_messages', user_id=target_user.id),
-    'clear_chat': url_for('clear_chat', user_id=target_user.id),
-    'export_chat': url_for('export_chat', user_id=target_user.id),
-    'edit_message_base': '/edit_message/',
-    'delete_message_base': '/delete_message/'
-  }
-} | tojson | safe }}
-</script>
 
+  <!-- Server-injected JSON -->
+  <script id="initial-data" type="application/json">
+    {{ {
+      'messages': messages,
+      'current_user_id': current_user.id,
+      'target_user_id': target_user.id,
+      'urls': {
+        'send_message': url_for('send_message', user_id=target_user.id),
+        'get_messages': url_for('get_messages', user_id=target_user.id),
+        'clear_chat': url_for('clear_chat', user_id=target_user.id),
+        'export_chat': url_for('export_chat', user_id=target_user.id)
+      }
+    } | tojson | safe }}
+  </script>
 
-</body>formatTime(ts) { 
-  const d = new Date(ts); 
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
-},
+  <script>
+    function chatApp() {
+      return {
+        meId: null, youId: null, urls: {}, msgs: [], groupedMessages: [],
+        newCount: 0, draft: '', lastFetchedAt: null, pollMs: 4000, _poller: null,
 
-escapeHtml(s) { 
-  if (!s) return ''; 
-  return String(s).replace(/\n/g, '<br/>'); 
-},
-formatTime(ts) { 
-  const d = new Date(ts); 
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
-},
+        init() {
+          const payload = JSON.parse(document.getElementById('initial-data').textContent);
+          this.meId = payload.current_user_id;
+          this.youId = payload.target_user_id;
+          this.urls  = payload.urls;
+          this.msgs  = (payload.messages || []).map(this.normalize);
+          if(this.msgs.length) this.lastFetchedAt = this.msgs[this.msgs.length-1].timestamp;
+          this.rebuildGroups();
+          this.$nextTick(()=>this.jumpToBottom(true));
+          this.poll();
+          this._poller = setInterval(()=>this.poll(), this.pollMs);
+        },
 
-escapeHtml(s) { 
-  if (!s) return ''; 
-  return String(s).replace(/\n/g, '<br/>'); 
-},
-formatTime(ts) { 
-  const d = new Date(ts); 
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
-},
+        normalize(m) {
+          const isMe = +m.sender_id === +this.meId;
+          return {
+            id: m.id,
+            sender_id: m.sender_id,
+            receiver_id: m.receiver_id,
+            isMe,
+            content: m.content||'',
+            content_html: this.escapeHtml(m.content||''),
+            timestamp: m.created_at,
+            edited: !!m.edited,
+            sender_avatar: m.sender_avatar||null,
+            sender_initial: (m.sender_name||'')[0]?.toUpperCase()||''
+          };
+        },
 
-escapeHtml(s) { 
-  if (!s) return ''; 
-  return String(s).replace(/\n/g, '<br/>'); 
-},
-formatTime(ts) { 
-  const d = new Date(ts); 
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
-},
+        rebuildGroups() {
+          const byDay = new Map();
+          for(const m of this.msgs){
+            const d = new Date(m.timestamp);
+            const key = `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
+            if(!byDay.has(key)) byDay.set(key,[]);
+            byDay.get(key).push(m);
+          }
+          this.groupedMessages = Array.from(byDay.entries()).map(([key, items])=>{
+            const [y,m,d] = key.split('-').map(Number);
+            const label = new Date(y,m-1,d).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'});
+            return {key, dateLabel: label, items};
+          });
+        },
 
-escapeHtml(s) { 
-  if (!s) return ''; 
-  return String(s).replace(/\n/g, '<br/>'); 
-},
-formatTime(ts) { 
-  const d = new Date(ts); 
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
-},
+        async poll() {
+          try {
+            const url = new URL(this.urls.get_messages, window.location.origin);
+            if(this.lastFetchedAt) url.searchParams.set('after', this.lastFetchedAt);
+            const r = await fetch(url, {headers: {'Accept':'application/json'}});
+            if(!r.ok) return;
+            const data = await r.json();
+            if(data.length){
+              const atBottom = this.isAtBottom();
+              for(const raw of data){
+                const nm = this.normalize(raw);
+                this.msgs.push(nm);
+                this.lastFetchedAt = nm.timestamp;
+                if(!atBottom) this.newCount++;
+              }
+              this.rebuildGroups();
+              if(atBottom) this.$nextTick(()=>this.jumpToBottom());
+            }
+          } catch {}
+        },
 
-escapeHtml(s) { 
-  if (!s) return ''; 
-  return String(s).replace(/\n/g, '<br/>'); 
-},formatTime(ts) { 
-  const d = new Date(ts); 
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
-},
+        onEnter(e){
+          if(e.shiftKey){
+            const t = e.target, start = t.selectionStart, end = t.selectionEnd;
+            this.draft = this.draft.substring(0,start) + "\n" + this.draft.substring(end);
+            this.$nextTick(()=>{ t.selectionStart = t.selectionEnd = start+1; });
+            return;
+          }
+          this.sendMessage();
+        },
 
-escapeHtml(s) { 
-  if (!s) return ''; 
-  return String(s).replace(/\n/g, '<br/>'); 
-},formatTime(ts) { 
-  const d = new Date(ts); 
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
-},
+        async sendMessage(){
+          const text = (this.draft||'').trim();
+          if(!text) return;
+          const tempId = 'tmp-'+Math.random().toString(36).slice(2);
+          const nowIso = new Date().toISOString();
+          const optimistic = {id: tempId, sender_id:this.meId, receiver_id:this.youId, isMe:true,
+            content:text, content_html:this.escapeHtml(text), timestamp: nowIso, edited:false};
+          this.msgs.push(optimistic);
+          this.rebuildGroups();
+          this.$nextTick(()=>this.jumpToBottom());
+          this.draft='';
 
-escapeHtml(s) { 
-  if (!s) return ''; 
-  return String(s).replace(/\n/g, '<br/>'); 
-},formatTime(ts) { 
-  const d = new Date(ts); 
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
-},
+          try{
+            const r = await fetch(this.urls.send_message,{
+              method:'POST',
+              headers:{'Content-Type':'application/json','Accept':'application/json'},
+              body:JSON.stringify({content:text})
+            });
+            if(!r.ok) throw 0;
+            const saved = await r.json();
+            const idx = this.msgs.findIndex(m=>m.id===tempId);
+            if(idx>-1) this.msgs.splice(idx,1,this.normalize(saved));
+            this.rebuildGroups();
+            this.lastFetchedAt=this.msgs[this.msgs.length-1].timestamp;
+          }catch{
+            const idx = this.msgs.findIndex(m=>m.id===tempId);
+            if(idx>-1) this.msgs[idx].content_html += '<div class="text-red-500 text-xs mt-1">Failed to send</div>';
+          }
+        },
 
-escapeHtml(s) { 
-  if (!s) return ''; 
-  return String(s).replace(/\n/g, '<br/>'); 
-},
-formatTime(ts) { 
-  const d = new Date(ts); 
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
-},
+        clearChatConfirm(){
+          if(!confirm('Clear this conversation for you?')) return;
+          fetch(this.urls.clear_chat,{method:'POST'}).then(()=>{ this.msgs=[]; this.rebuildGroups(); this.newCount=0; });
+        },
 
-escapeHtml(s) { 
-  if (!s) return ''; 
-  return String(s).replace(/\n/g, '<br/>'); 
-},formatTime(ts) { 
-  const d = new Date(ts); 
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
-},
+        exportChat(){ window.open(this.urls.export_chat,'_blank'); },
 
-escapeHtml(s) { 
-  if (!s) return ''; 
-  return String(s).replace(/\n/g, '<br/>'); 
-},formatTime(ts) { 
-  const d = new Date(ts); 
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
-},
+        onScroll(){
+          if(this.isAtBottom() && this.newCount>0) this.newCount=0;
+        },
 
-escapeHtml(s) { 
-  if (!s) return ''; 
-  return String(s).replace(/\n/g, '<br/>'); 
-},
-formatTime(ts) { 
-  const d = new Date(ts); 
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); 
-},
+        jumpToBottom(immediate=false){
+          const el = this.$refs.box;
+          if(!el) return;
+          if(immediate){ el.scrollTop = el.scrollHeight; return; }
+          el.scrollTo({top: el.scrollHeight, behavior:'smooth'}); this.newCount=0;
+        },
 
-escapeHtml(s) { 
-  if (!s) return ''; 
-  return String(s).replace(/\n/g, '<br/>'); 
-},
+        isAtBottom(){
+          const el = this.$refs.box; if(!el) return true;
+          return el.scrollHeight - el.scrollTop - el.clientHeight < 8;
+        },
 
+        formatTime(ts){ const d = new Date(ts); return d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); },
 
-
-
-
+        escapeHtml(s){ if(!s) return ''; const div = document.createElement('div'); div.innerText = String(s); return div.innerHTML.replace(/\n/g,'<br/>'); },
+      }
+    }
+  </script>
+</body>
 </html>
