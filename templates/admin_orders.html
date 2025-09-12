@@ -77,17 +77,20 @@
         </thead>
         <tbody id="orderTableBody" class="text-center">
           {% for order in orders %}
-          <tr class="data-row hover:bg-gray-50">
-            <td>{{ order.product.name }}</td>
-            <td>{{ order.product.identification_number }}</td>
-            <td>{{ order.product.in_stock }}</td>
-            <td>{{ order.quantity }}</td>
-            <td>{{ order.selling_price | round(2) }}</td>
-            <td>{{ order.amount | round(2) }}</td>
-            <td>{{ order.seller.username }}</td>
-            <td>{{ order.location or "N/A" }}</td>
-            <td>{% if order.date_sold %}{{ order.date_sold.strftime('%Y-%m-%d %H:%M:%S') }}{% else %}No Date Sold{% endif %}</td>
+          <tr class="data-row hover:bg-gray-50" data-purchase-cost="{{ order.purchase_cost or 0 }}" data-usage-cost="{{ order.usage_cost or 0 }}">
+              <td>{{ order.product.name }}</td>
+              <td>{{ order.product.identification_number }}</td>
+              <td>{{ order.product.in_stock }}</td>
+              <td class="orderQty">{{ order.quantity }}</td>
+              <td>{{ order.selling_price | round(2) }}</td>
+              <td class="orderAmount">{{ order.amount | round(2) }}</td>
+              <td>{{ order.seller.username }}</td>
+              <td>{{ order.location or "N/A" }}</td>
+              <td>{% if order.date_sold %}{{ order.date_sold.strftime('%Y-%m-%d %H:%M:%S') }}{% else %}No Date Sold{% endif %}</td>
           </tr>
+
+
+          
           {% else %}
           <tr class="no-data"><td colspan="8" class="py-6 text-gray-500">No orders found.</td></tr>
           {% endfor %}
@@ -104,10 +107,17 @@
     <!-- Totals + Toggle -->
     <div class="mt-4 flex items-center gap-4 justify-center">
       <button id="showTotalsBtn" class="px-4 py-2 rounded-md show-totals bg-green-600 text-white">Show Totals</button>
+
       <div id="totalsContainer" class="text-center" style="display:none;">
         <p><strong>Total Quantity Sold:</strong> <span id="totalQuantity">0</span></p>
         <p><strong>Total Amount Made (₦):</strong> ₦<span id="totalAmount">0.00</span></p>
+        <p><strong>Total Purchase Cost (₦):</strong> ₦<span id="totalPurchase">0.00</span></p>
+        <p><strong>Total Usage Cost (₦):</strong> ₦<span id="totalUsageCost">0.00</span></p>
+        <p><strong>Profit / Loss (₦):</strong> 
+          <span id="totalProfit" style="font-weight:bold;">0.00</span>
+        </p>
       </div>
+
     </div>
 
     <!-- Charts -->
@@ -268,42 +278,66 @@
       renderPage(1);
 
       // --- Totals button ---
+      // --- Totals button ---
       const showTotalsBtn = document.getElementById('showTotalsBtn');
       const totalsContainer = document.getElementById('totalsContainer');
       const totalQuantityEl = document.getElementById('totalQuantity');
       const totalAmountEl = document.getElementById('totalAmount');
+      const totalPurchaseEl = document.getElementById('totalPurchase');
+      const totalUsageEl = document.getElementById('totalUsageCost'); 
+      const totalProfitEl = document.getElementById('totalProfit');   
 
       function calculateTotals() {
-        let totalQuantity = 0;
-        let totalAmount = 0;
-        // iterate through visible rows in tbody
-        const visibleRows = Array.from(tbody.querySelectorAll('tr')).filter(r => r.classList.contains('data-row'));
-        visibleRows.forEach(row => {
-          const cells = row.children;
-          const qty = parseInt(cells[3].textContent.trim(), 10) || 0;
-          const amt = parseFloat(cells[5].textContent.trim()) || 0;
-          totalQuantity += qty;
-          totalAmount += amt;
-        });
-        totalQuantityEl.textContent = totalQuantity;
-        totalAmountEl.textContent = totalAmount.toFixed(2);
+          let totalQuantity = 0;
+          let totalAmount = 0;
+          let totalPurchase = 0;
+          let totalUsage = 0;
+          let totalProfitLoss = 0;
+
+          // Only visible rows on the current page
+          const visibleRows = Array.from(tbody.querySelectorAll('tr.data-row'));
+
+          visibleRows.forEach(row => {
+              const cells = row.children;
+
+              const qty = parseInt(cells[3].textContent.trim(), 10) || 0;
+              const amt = parseFloat(cells[5].textContent.trim()) || 0;
+              const purchase = parseFloat(cells[5].dataset.purchaseCost) || 0;
+              const usage = parseFloat(cells[5].dataset.usageCost) || 0;
+              const profitLoss = amt - (purchase + usage);
+
+
+
+              totalQuantity += qty;
+              totalAmount += amt;
+              totalPurchase += purchase;
+              totalUsage += usage;
+              totalProfitLoss += profitLoss;
+          });
+
+          totalQuantityEl.textContent = totalQuantity;
+          totalAmountEl.textContent = totalAmount.toFixed(2);
+          totalPurchaseEl.textContent = totalPurchase.toFixed(2);
+          totalUsageEl.textContent = totalUsage.toFixed(2);
+          totalProfitEl.textContent = totalProfitLoss.toFixed(2);
       }
 
       showTotalsBtn.addEventListener('click', () => {
-        if (totalsContainer.style.display === 'none' || totalsContainer.style.display === '') {
-          calculateTotals();
-          totalsContainer.style.display = 'block';
-          showTotalsBtn.textContent = 'Hide Totals';
-          showTotalsBtn.classList.remove('bg-green-600');
-          showTotalsBtn.classList.add('bg-brown-600');
-          showTotalsBtn.style.backgroundColor = 'brown';
-        } else {
-          totalsContainer.style.display = 'none';
-          showTotalsBtn.textContent = 'Show Totals';
-          showTotalsBtn.style.backgroundColor = '';
-          showTotalsBtn.classList.add('bg-green-600');
-        }
+          if (totalsContainer.style.display === 'none' || totalsContainer.style.display === '') {
+              calculateTotals();
+              totalsContainer.style.display = 'block';
+              showTotalsBtn.textContent = 'Hide Totals';
+              showTotalsBtn.classList.remove('bg-green-600');
+              showTotalsBtn.classList.add('bg-brown-600');
+              showTotalsBtn.style.backgroundColor = 'brown';
+          } else {
+              totalsContainer.style.display = 'none';
+              showTotalsBtn.textContent = 'Show Totals';
+              showTotalsBtn.style.backgroundColor = '';
+              showTotalsBtn.classList.add('bg-green-600');
+          }
       });
+
 
       // --- Export button (graceful client-side download) ---
       const exportBtn = document.getElementById('exportSalesDataBtn');
@@ -412,6 +446,52 @@
 
     }); // DOMContentLoaded
   </script>
+
+
+  <script>
+      document.addEventListener('DOMContentLoaded', () => {
+          const showTotalsBtn = document.getElementById('showTotalsBtn');
+          const totalQuantityEl = document.getElementById('totalQuantity');
+          const totalAmountEl = document.getElementById('totalAmount');
+          const totalPurchaseEl = document.getElementById('totalPurchase');
+          const totalUsageEl = document.getElementById('totalUsage');
+          const totalProfitEl = document.getElementById('totalProfit');
+
+          showTotalsBtn.addEventListener('click', () => {
+              let totalQty = 0;
+              let totalAmt = 0;
+              let totalPurchase = 0;
+              let totalUsage = 0;
+              let totalProfit = 0;
+
+              // Loop through each row of your sales table
+              document.querySelectorAll('#orderTableBody tr').forEach(row => {
+                  const qty = parseFloat(row.querySelector('.orderQty').textContent) || 0;
+                  const amt = parseFloat(row.querySelector('.orderAmount').textContent.replace(/,/g,'')) || 0;
+
+                  // Fetch purchase & usage cost from data attributes (must be set in backend)
+                  const purchaseCost = parseFloat(row.dataset.purchaseCost) || 0;
+                  const usageCost = parseFloat(row.dataset.usageCost) || 0;
+
+                  const profit = amt - (purchaseCost + usageCost);
+
+                  totalQty += qty;
+                  totalAmt += amt;
+                  totalPurchase += purchaseCost;
+                  totalUsage += usageCost;
+                  totalProfit += profit;
+              });
+
+              // Display totals
+              totalQuantityEl.textContent = totalQty;
+              totalAmountEl.textContent = totalAmt.toFixed(2);
+              totalPurchaseEl.textContent = totalPurchase.toFixed(2);
+              totalUsageEl.textContent = totalUsage.toFixed(2);
+              totalProfitEl.textContent = totalProfit.toFixed(2);
+          });
+      });
+      </script>
+
 
 </body>
 </html>

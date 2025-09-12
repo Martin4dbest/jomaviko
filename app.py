@@ -633,6 +633,7 @@ def delete_product(product_id):
 
     return redirect(url_for('admin_dashboard'))
 
+"""
 @app.route('/admin', methods=['GET', 'POST'])
 @login_required
 def admin_dashboard():
@@ -731,6 +732,123 @@ def admin_dashboard():
         admin_name=admin_name
     )
 
+"""
+
+@app.route('/admin', methods=['GET', 'POST'])
+@login_required
+def admin_dashboard():
+    if current_user.role != 'admin':
+        return redirect(url_for('login'))
+
+    # Handle import from Google Sheets
+    if request.method == 'POST' and 'import_button' in request.form:
+        location = request.form.get('location', '').strip()
+
+        if not location:
+            flash("Please select a location before importing data.", "danger")
+            return redirect(url_for('admin_dashboard'))
+
+        try:
+            sheet_data = get_google_sheet_data_by_location(location)
+            if not sheet_data:
+                flash(f"No data found for location {location}.", "danger")
+                return redirect(url_for('admin_dashboard'))
+
+            for row in sheet_data:
+                name = row.get('name', '').strip()
+                identification_number = row.get('identification_number', '').strip()
+                price = float(row.get('price', 0.0))
+                in_stock = int(row.get('in_stock', 0))
+
+                if not name or not identification_number:
+                    continue  # skip incomplete rows
+
+                existing_product = Product.query.filter_by(
+                    identification_number=identification_number
+                ).first()
+
+                if existing_product:
+                    continue  # skip duplicate
+
+                product = Product(
+                    name=name,
+                    identification_number=identification_number,
+                    price=price,
+                    selling_price=None,
+                    location=location
+                )
+                db.session.add(product)
+                db.session.commit()
+
+                sellers = User.query.filter(
+                    User.location.ilike(f"%{location}%"),
+                    User.role == 'seller'
+                ).all()
+
+                if not sellers:
+                    flash(f"No sellers found for location: {location}", "warning")
+                    continue
+
+                for seller in sellers:
+                    inventory = Inventory(
+                        product_id=product.id,
+                        seller_id=seller.id,
+                        quantity_in_stock=10 if in_stock else 0
+                    )
+                    db.session.add(inventory)
+
+            db.session.commit()
+            flash(f"Successfully imported data for location {location}!", "success")
+
+        except Exception as e:
+            flash(f"An error occurred while importing data: {str(e)}", "danger")
+
+    # Search logic
+    search_query = request.args.get('search', '').strip()
+    if search_query:
+        products = Product.query.filter(Product.name.ilike(f"%{search_query}%")).all()
+    else:
+        products = Product.query.all()
+
+    inventories = {inv.product_id: inv for inv in Inventory.query.all()}
+    orders = Order.query.all()
+
+    # -----------------------------
+    # Prepare orders for profit/loss
+    # -----------------------------
+    order_list = []
+    for order in orders:
+        product = Product.query.get(order.product_id)
+        purchase_cost = getattr(product, 'purchase_cost', 0)  # cost to buy
+        usage_cost = getattr(product, 'usage_cost', 0)       # other expenses
+        order_list.append({
+            "product_name": product.name,
+            "identification_number": product.identification_number,
+            "in_stock": inventories.get(product.id).quantity_in_stock if inventories.get(product.id) else 0,
+            "quantity_sold": order.quantity,
+            "selling_price": order.selling_price,
+            "amount": order.amount,
+            "purchase_cost": purchase_cost,
+            "usage_cost": usage_cost,
+            "profit_loss": order.amount - (purchase_cost + usage_cost),
+            "seller": order.seller.username,
+            "location": order.location,
+            "date_sold": order.date_sold,
+        })
+
+    admins = User.query.filter_by(role='admin').all()
+    admin_name = current_user.username
+
+    return render_template(
+        'admin_dashboard.html',
+        products=products,
+        inventories=inventories,
+        orders=order_list,  # <-- now includes purchase_cost, usage_cost, profit_loss
+        user_role='admin',
+        search_query=search_query,
+        admins=admins,
+        admin_name=admin_name
+    )
 
 
 @app.route('/baker-inventory')
