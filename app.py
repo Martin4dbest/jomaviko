@@ -407,7 +407,7 @@ def authenticate_google_sheets():
 def get_google_sheet_data_by_location(sheet_name):
     service = authenticate_google_sheets()
 
-    # 🔹 Fetch spreadsheet metadata (list of sheet/tab names)
+    # 🔹 Fetch spreadsheet metadata (list of sheet/tab names here)
     spreadsheet = service.spreadsheets().get(spreadsheetId=SPREADSHEET_ID).execute()
     available_sheets = [s['properties']['title'] for s in spreadsheet['sheets']]
 
