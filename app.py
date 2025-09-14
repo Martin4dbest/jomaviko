@@ -104,9 +104,20 @@ class Order(db.Model):
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+"""
+# Define User model for authentication (admin/seller)
+class User(UserMixin, db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(100), nullable=False, unique=True)
+    password = db.Column(db.String(256), nullable=False)
+    role = db.Column(db.String(50), nullable=False)  # "admin" or "seller"
+    location = db.Column(db.String(100), nullable=True)
+"""
 
 # Define User model for authentication (admin/seller)
 class User(UserMixin, db.Model):
+    __tablename__ = "user"   # ✅ Force SQLAlchemy to map to "user" table
+
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), nullable=False, unique=True)
     password = db.Column(db.String(256), nullable=False)
