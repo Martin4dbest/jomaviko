@@ -376,36 +376,43 @@ SERVICE_ACCOUNT_FILE = os.getenv("SERVICE_ACCOUNT_FILE")
 # Google Sheets API scope
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
+
 def authenticate_google_sheets():
-    """
-    Authenticate with Google Sheets API using either:
-    - SERVICE_ACCOUNT_JSON (Render environment)
-    - SERVICE_ACCOUNT_FILE (local file for development)
-    """
     try:
         service_account_json = os.getenv("SERVICE_ACCOUNT_JSON")
+        credentials = None
 
+        # ✅ Render: JSON in environment variable
         if service_account_json:
-            # 🔹 Render: JSON from environment variable
+            # Sometimes Render escapes quotes, so fix double escapes
+            service_account_json = service_account_json.replace('\\"', '"')
+            service_account_json = service_account_json.replace("\\n", "\n")
+            
             info = json.loads(service_account_json)
-            # Fix escaped newlines in private key
-            if "private_key" in info and "\\n" in info["private_key"]:
-                info["private_key"] = info["private_key"].replace("\\n", "\n")
             credentials = Credentials.from_service_account_info(info, scopes=SCOPES)
-        
-        else:
-            # 🔹 Local: use the file
-            if not SERVICE_ACCOUNT_FILE:
-                raise ValueError("No SERVICE_ACCOUNT_FILE set for local development")
+
+        # ✅ Local: file fallback
+        elif SERVICE_ACCOUNT_FILE and os.path.exists(SERVICE_ACCOUNT_FILE):
             credentials = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
 
-        # Build the Google Sheets service
-        service = build('sheets', 'v4', credentials=credentials)
+        else:
+            raise ValueError("No SERVICE_ACCOUNT_JSON or SERVICE_ACCOUNT_FILE found")
+
+        # Build Sheets service
+        service = build("sheets", "v4", credentials=credentials)
         return service
 
     except Exception as e:
         print(f"❌ Error during Google Sheets authentication: {e}")
         return None
+
+# Initialize
+service = authenticate_google_sheets()
+if service:
+    print("✅ Google Sheets service ready")
+else:
+    print("❌ Google Sheets service failed to initialize")
+    
 
 
 def get_google_sheet_data_by_location(sheet_name):
