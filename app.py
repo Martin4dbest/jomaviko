@@ -362,39 +362,33 @@ def get_google_sheet_data():
     return formatted_data
 """
 
-import os
-import json
-from google.oauth2.service_account import Credentials
-from googleapiclient.discovery import build
 
-# The ID of your Google Sheet
+# The ID of your Google Sheet (loaded from .env)
 SPREADSHEET_ID = os.getenv('GOOGLE_SHEET_ID')
-
-# Local JSON file path
-LOCAL_SERVICE_ACCOUNT_FILE = 'service_account.json'  # only for local dev
-
+SERVICE_ACCOUNT_FILE = os.getenv("SERVICE_ACCOUNT_FILE") 
 # Google Sheets API scope
+#SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
+
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+
 
 def authenticate_google_sheets():
     try:
-        service_account_json = os.getenv("SERVICE_ACCOUNT_JSON")
-
-        if service_account_json:
-            # Render: JSON from env
-            info = json.loads(service_account_json)
+        if os.getenv("SERVICE_ACCOUNT_JSON"):
+            # Use JSON directly from environment variable
+            info = json.loads(os.getenv("SERVICE_ACCOUNT_JSON"))
             if "private_key" in info and "\\n" in info["private_key"]:
                 info["private_key"] = info["private_key"].replace("\\n", "\n")
             credentials = Credentials.from_service_account_info(info, scopes=SCOPES)
         else:
-            # Local: use file
-            if not os.path.exists(LOCAL_SERVICE_ACCOUNT_FILE):
-                raise FileNotFoundError(f"Local file '{LOCAL_SERVICE_ACCOUNT_FILE}' not found")
-            credentials = Credentials.from_service_account_file(LOCAL_SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+            # Local development: use the file
+            service_account_file = os.getenv("SERVICE_ACCOUNT_FILE")
+            if not service_account_file:
+                raise ValueError("No SERVICE_ACCOUNT_FILE set for local dev")
+            credentials = Credentials.from_service_account_file(service_account_file, scopes=SCOPES)
 
         service = build('sheets', 'v4', credentials=credentials)
         return service
-
     except Exception as e:
         print(f"❌ Error during Google Sheets authentication: {e}")
         return None
@@ -402,10 +396,11 @@ def authenticate_google_sheets():
 
 
 
+
 def get_google_sheet_data_by_location(sheet_name):
     service = authenticate_google_sheets()
 
-    # 🔹 Fetch spreadsheet metadata (list of sheet/tab names here)
+    # 🔹 Fetch spreadsheet metadata (list of sheet/tab names)
     spreadsheet = service.spreadsheets().get(spreadsheetId=SPREADSHEET_ID).execute()
     available_sheets = [s['properties']['title'] for s in spreadsheet['sheets']]
 
