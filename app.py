@@ -378,27 +378,33 @@ SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
 
 def authenticate_google_sheets():
+    """
+    Authenticate with Google Sheets API using:
+    - SERVICE_ACCOUNT_JSON (Render environment)
+    - SERVICE_ACCOUNT_FILE (local file)
+    """
     try:
         service_account_json = os.getenv("SERVICE_ACCOUNT_JSON")
         credentials = None
 
-        # ✅ Render: JSON in environment variable
+        # 🔹 Render: JSON string from environment variable
         if service_account_json:
-            # Sometimes Render escapes quotes, so fix double escapes
-            service_account_json = service_account_json.replace('\\"', '"')
-            service_account_json = service_account_json.replace("\\n", "\n")
-            
+            # Step 1: load as raw JSON string safely
             info = json.loads(service_account_json)
+
+            # Step 2: fix private_key newline
+            if "private_key" in info:
+                info["private_key"] = info["private_key"].replace("\\n", "\n")
+
             credentials = Credentials.from_service_account_info(info, scopes=SCOPES)
 
-        # ✅ Local: file fallback
+        # 🔹 Local: use the file
         elif SERVICE_ACCOUNT_FILE and os.path.exists(SERVICE_ACCOUNT_FILE):
             credentials = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
 
         else:
             raise ValueError("No SERVICE_ACCOUNT_JSON or SERVICE_ACCOUNT_FILE found")
 
-        # Build Sheets service
         service = build("sheets", "v4", credentials=credentials)
         return service
 
@@ -412,7 +418,7 @@ if service:
     print("✅ Google Sheets service ready")
 else:
     print("❌ Google Sheets service failed to initialize")
-    
+
 
 
 def get_google_sheet_data_by_location(sheet_name):
