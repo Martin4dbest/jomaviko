@@ -371,7 +371,7 @@ SERVICE_ACCOUNT_FILE = os.getenv("SERVICE_ACCOUNT_FILE")
 
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 
-
+"""
 def authenticate_google_sheets():
     try:
         if os.getenv("SERVICE_ACCOUNT_JSON"):
@@ -387,6 +387,29 @@ def authenticate_google_sheets():
     except Exception as e:
         print(f"❌ Error during Google Sheets authentication: {e}")
         return None
+"""
+
+def authenticate_google_sheets():
+    try:
+        if os.getenv("SERVICE_ACCOUNT_JSON"):
+            # Use JSON directly from environment variable
+            info = json.loads(os.getenv("SERVICE_ACCOUNT_JSON"))
+            if "private_key" in info and "\\n" in info["private_key"]:
+                info["private_key"] = info["private_key"].replace("\\n", "\n")
+            credentials = Credentials.from_service_account_info(info, scopes=SCOPES)
+        else:
+            # Local development: use the file
+            service_account_file = os.getenv("SERVICE_ACCOUNT_FILE")
+            if not service_account_file:
+                raise ValueError("No SERVICE_ACCOUNT_FILE set for local dev")
+            credentials = Credentials.from_service_account_file(service_account_file, scopes=SCOPES)
+
+        service = build('sheets', 'v4', credentials=credentials)
+        return service
+    except Exception as e:
+        print(f"❌ Error during Google Sheets authentication: {e}")
+        return None
+
 
 
 
