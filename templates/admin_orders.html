@@ -59,6 +59,7 @@
       </form>
     </div>
 
+
     <!-- Orders Table (responsive) -->
     <div class="bg-white rounded-lg shadow overflow-x-auto">
       <table class="table table-striped table-hover w-full text-sm m-0">
@@ -77,20 +78,22 @@
         </thead>
         <tbody id="orderTableBody" class="text-center">
           {% for order in orders %}
-          <tr class="data-row hover:bg-gray-50" data-purchase-cost="{{ order.purchase_cost or 0 }}" data-usage-cost="{{ order.usage_cost or 0 }}">
-              <td>{{ order.product.name }}</td>
-              <td>{{ order.product.identification_number }}</td>
-              <td>{{ order.product.in_stock }}</td>
-              <td class="orderQty">{{ order.quantity }}</td>
-              <td>{{ order.selling_price | round(2) }}</td>
-              <td class="orderAmount">{{ order.amount | round(2) }}</td>
-              <td>{{ order.seller.username }}</td>
-              <td>{{ order.location or "N/A" }}</td>
-              <td>{% if order.date_sold %}{{ order.date_sold.strftime('%Y-%m-%d %H:%M:%S') }}{% else %}No Date Sold{% endif %}</td>
+          <tr class="data-row hover:bg-gray-50" 
+              data-purchase-cost="{{ order.purchase_cost or 0 }}" 
+              data-usage-cost="{{ order.usage_cost or 0 }}">
+            <td>{{ order.product.name }}</td>
+            <td>{{ order.product.identification_number }}</td>
+            <td>{{ order.product.in_stock }}</td>
+            <td class="orderQty">{{ order.quantity }}</td>
+            <td>{{ order.selling_price | round(2) }}</td>
+            <td class="orderAmount">{{ order.amount | round(2) }}</td>
+            <td>{{ order.seller.username }}</td>
+            <td>{{ order.location or "N/A" }}</td>
+            <td>{% if order.date_sold %}{{ order.date_sold.strftime('%Y-%m-%d %H:%M:%S') }}{% else %}No Date Sold{% endif %}</td>
           </tr>
 
 
-          
+   
           {% else %}
           <tr class="no-data"><td colspan="8" class="py-6 text-gray-500">No orders found.</td></tr>
           {% endfor %}
@@ -104,9 +107,12 @@
       </div>
     </div>
 
-    <!-- Totals + Toggle -->
+    </div> 
+        <!-- Totals + Toggle -->
     <div class="mt-4 flex items-center gap-4 justify-center">
-      <button id="showTotalsBtn" class="px-4 py-2 rounded-md show-totals bg-green-600 text-white">Show Totals</button>
+      <button id="showTotalsBtn" class="px-4 py-2 rounded-md show-totals bg-green-600 text-white" style="display:none;">
+        Show Totals
+      </button>
 
       <div id="totalsContainer" class="text-center" style="display:none;">
         <p><strong>Total Quantity Sold:</strong> <span id="totalQuantity">0</span></p>
@@ -117,8 +123,87 @@
           <span id="totalProfit" style="font-weight:bold;">0.00</span>
         </p>
       </div>
-
     </div>
+    
+
+
+
+    <!-- Include Alpine.js for toggling -->
+    <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+
+    <!-- Financial Summary Card -->
+    <div x-data="{ open: false }" 
+        class="bg-gray-50 rounded-lg shadow p-0.5 mb-4 max-w-md mx-auto">
+
+      <div class="bg-white rounded-lg p-3">
+        <!-- Header -->
+        <div class="flex items-center justify-between cursor-pointer" @click="open = !open">
+          <div class="flex items-center space-x-2">
+            <span class="text-xl">💰</span>
+            <div>
+              <h3 class="text-md font-semibold text-gray-800">Bakery Financial Performance</h3>
+              <p class="text-xs text-gray-500">Check your profit and losses</p>
+            </div>
+          </div>
+          <div class="flex items-center space-x-2">
+            <span class="px-2 py-0.5 bg-yellow-400 text-white text-xs font-medium rounded">
+              View Details
+            </span>
+            <svg :class="{ 'rotate-180': open }" 
+                class="w-4 h-4 text-gray-600 transform transition-transform duration-300" 
+                fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </div>
+        </div>
+
+        <!-- Collapsible content -->
+        <div x-show="open" x-transition class="mt-2 text-gray-700 text-sm">
+          <ul class="space-y-1">
+            <li class="flex justify-between">
+              <span>Total Sales:</span>
+              <span class="font-semibold text-green-600">
+                ₦{{ '%.2f' % (total_sales|default(0)) }}
+              </span>
+            </li>
+            <li class="flex justify-between">
+              <span>Purchase Cost:</span>
+              <span class="font-semibold text-red-600">
+                ₦{{ '%.2f' % (total_purchase_cost|default(0)) }}
+              </span>
+            </li>
+            <li class="flex justify-between">
+              <span>Usage Cost:</span>
+              <span class="font-semibold text-orange-600">
+                ₦{{ '%.2f' % (total_usage_cost|default(0)) }}
+              </span>
+            </li>
+            <li class="flex justify-between border-t pt-1">
+              <span class="font-bold flex items-center gap-1">
+                {% if profit_loss >= 0 %}
+                  ✅ Profit:
+                {% else %}
+                  ❌ Loss:
+                {% endif %}
+              </span>
+              <span class="font-bold 
+                          {% if profit_loss >= 0 %} text-green-700 {% else %} text-red-700 {% endif %}">
+                ₦{{ '%.2f' % (profit_loss|default(0)) }}
+              </span>
+            </li>
+          </ul>
+
+          <!-- Export Button -->
+          <div class="mt-2 text-center">
+            <a href="{{ url_for('export_financial_summary') }}" 
+              class="inline-block px-3 py-1 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 transition">
+              📥 Export as PDF
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+
 
     <!-- Charts -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">

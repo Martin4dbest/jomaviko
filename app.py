@@ -157,7 +157,7 @@ class Message(db.Model):
     sender = db.relationship('User', foreign_keys=[sender_id], passive_deletes=True)
     receiver = db.relationship('User', foreign_keys=[receiver_id], passive_deletes=True)
 
-
+"""
 class BakerInventory(db.Model):  
     __tablename__ = "baker_inventory"   # explicitly set table name
 
@@ -169,6 +169,49 @@ class BakerInventory(db.Model):
     status = db.Column(db.String(20), default='pending')
 
     seller = db.relationship('User', backref='baker_inventories')
+"""
+import json
+
+class BakerInventory(db.Model):
+    __tablename__ = "baker_inventory"
+
+    id = db.Column(db.Integer, primary_key=True)
+    seller_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    purchases = db.Column(db.JSON, nullable=False)   # e.g. list/dict with cost
+    breads = db.Column(db.JSON, nullable=False)      # e.g. list/dict with ingredients
+    date_sent = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(20), default='pending')
+
+    seller = db.relationship('User', backref='baker_inventories')
+
+    @property
+    def total_purchase_cost(self):
+        if not self.purchases:
+            return 0
+        if isinstance(self.purchases, dict):
+            return sum((item.get("cost", 0) or 0) for item in self.purchases.values())
+        elif isinstance(self.purchases, list):
+            return sum((item.get("cost", 0) or 0) for item in self.purchases)
+        return 0
+
+    @property
+    def total_usage_cost(self):
+        if not self.breads:
+            return 0
+
+        total = 0
+        if isinstance(self.breads, list):
+            for bread in self.breads:
+                # If bread has ingredients, loop through them
+                ingredients = bread.get("ingredients", [])
+                for ing in ingredients:
+                    total += ing.get("usage_cost", ing.get("cost", 0)) or 0
+        elif isinstance(self.breads, dict):
+            ingredients = self.breads.get("ingredients", [])
+            for ing in ingredients:
+                total += ing.get("usage_cost", ing.get("cost", 0)) or 0
+
+        return total
 
 
 
@@ -258,109 +301,6 @@ def load_user(user_id):
 def index():
     return render_template('index.html')
 
-"""
-# Path to your service account JSON file (loaded from .env)
-SERVICE_ACCOUNT_FILE = os.getenv('SERVICE_ACCOUNT_FILE_PATH')
-
-# The ID of your Google Sheet (loaded from .env)
-SPREADSHEET_ID = os.getenv('GOOGLE_SHEET_ID')
-
-# Google Sheets API scope
-SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly']
-
-# Authenticate using the service account
-def authenticate_google_sheets():
-    credentials = Credentials.from_service_account_file(
-        SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-    service = build('sheets', 'v4', credentials=credentials)
-    return service
-# Function to fetch data from Google
-"""
-
-"""
-def get_google_sheet_data():
-    service = authenticate_google_sheets()
-    sheet = service.spreadsheets()
-
-    # Define the range of the Google Sheet (e.g., columns A to D, starting from row 2)
-    result = sheet.values().get(
-        spreadsheetId=SPREADSHEET_ID,
-        range="Sheet1!A2:D"  # Ensure that the 'in_stock' column is in column D
-    ).execute()
-
-    # Extract values and handle empty data
-    values = result.get('values', [])
-    if not values:
-        return []  # No data found
-
-    # Debugging: log the raw values from the sheet
-    print(f"Raw Google Sheet Data: {values}")
-
-    # Convert rows into structured dictionaries
-    formatted_data = []
-    for row in values:
-        price = float(row[2]) if len(row) > 2 and row[2] else 0.0
-
-        # Improved handling for 'in_stock' with additional logging
-        in_stock = 0  # Default to 0 if the value is invalid or missing
-        if len(row) > 3 and row[3]:
-            try:
-                # Attempt to parse 'in_stock' as an integer
-                in_stock = int(row[3])
-            except ValueError:
-                in_stock = 0  # Default to 0 if invalid
-        else:
-            print(f"Warning: Missing 'in_stock' value in row: {row}")
-
-        # Log what's being parsed
-        print(f"Row: {row}, Parsed In Stock: {in_stock}")
-
-        formatted_data.append({
-            'name': row[0] if len(row) > 0 else '',
-            'identification_number': row[1] if len(row) > 1 else '',
-            'price': price,
-            'in_stock': in_stock
-        })
-
-    # Now we update or insert into the database
-    for product_data in formatted_data:
-        selling_price = product_data['price']
-        identification_number = product_data['identification_number']
-        in_stock = product_data['in_stock']
-
-        # Check if the product exists in the database using identification_number
-        existing_product = Product.query.filter_by(identification_number=identification_number).first()
-
-        if existing_product:
-            # If product exists, update only the changed fields
-            if existing_product.name != product_data['name']:
-                existing_product.name = product_data['name']
-            if existing_product.price != product_data['price']:
-                existing_product.price = product_data['price']
-
-            # Update 'in_stock' only if the new value is different and represents a restock or new product
-            if existing_product.in_stock != in_stock:
-                # Only update if in_stock value from the sheet is greater than current stock
-                if in_stock > existing_product.in_stock:
-                    print(f"Restocking {existing_product.name} from {existing_product.in_stock} to {in_stock}")
-                    existing_product.in_stock = in_stock  # Update only if new stock is greater
-                else:
-                    print(f"Skipping update for {existing_product.name} as the sheet has lower stock than current.")
-            
-            db.session.commit()
-        else:
-            # If product doesn't exist, create a new product
-            new_product = Product(
-                name=product_data['name'],
-                identification_number=identification_number,
-                price=product_data['price'],
-                in_stock=in_stock  # Use the correctly parsed in_stock value
-            )
-            db.session.add(new_product)
-            db.session.commit()
-
-    return formatted_data
-"""
 
 import os
 import json
@@ -668,106 +608,6 @@ def delete_product(product_id):
 
     return redirect(url_for('admin_dashboard'))
 
-"""
-@app.route('/admin', methods=['GET', 'POST'])
-@login_required
-def admin_dashboard():
-    if current_user.role != 'admin':
-        return redirect(url_for('login'))
-
-    # Handle import from Google Sheets
-    if request.method == 'POST' and 'import_button' in request.form:
-        location = request.form.get('location', '').strip()
-
-        if not location:
-            flash("Please select a location before importing data.", "danger")
-            return redirect(url_for('admin_dashboard'))
-
-        try:
-            sheet_data = get_google_sheet_data_by_location(location)
-            if not sheet_data:
-                flash(f"No data found for location {location}.", "danger")
-                return redirect(url_for('admin_dashboard'))
-
-            for row in sheet_data:
-                name = row.get('name', '').strip()
-                identification_number = row.get('identification_number', '').strip()
-                price = float(row.get('price', 0.0))
-                in_stock = int(row.get('in_stock', 0))
-
-                if not name or not identification_number:
-                    continue  # skip incomplete rows
-
-                # Check if product already exists
-                existing_product = Product.query.filter_by(
-                    identification_number=identification_number
-                ).first()
-
-                if existing_product:
-                    continue  # skip duplicate
-
-                # Create new product
-                product = Product(
-                    name=name,
-                    identification_number=identification_number,
-                    price=price,
-                    selling_price=None,
-                    location=location
-                )
-                db.session.add(product)
-                db.session.commit()
-
-                # Get all sellers in this location (partial match)
-                sellers = User.query.filter(
-                    User.location.ilike(f"%{location}%"),
-                    User.role == 'seller'
-                ).all()
-
-                if not sellers:
-                    flash(f"No sellers found for location: {location}", "warning")
-                    continue
-
-                # Add inventory entries for each seller
-                for seller in sellers:
-                    inventory = Inventory(
-                        product_id=product.id,
-                        seller_id=seller.id,
-                        quantity_in_stock=10 if in_stock else 0
-                    )
-                    db.session.add(inventory)
-
-            db.session.commit()
-            flash(f"Successfully imported data for location {location}!", "success")
-
-        except Exception as e:
-            flash(f"An error occurred while importing data: {str(e)}", "danger")
-
-    # Search logic
-    search_query = request.args.get('search', '').strip()
-    if search_query:
-        products = Product.query.filter(Product.name.ilike(f"%{search_query}%")).all()
-    else:
-        products = Product.query.all()
-
-    inventories = {inv.product_id: inv for inv in Inventory.query.all()}
-    orders = Order.query.all()
-
-    # Fetch all admins and the current logged-in admin name
-    admins = User.query.filter_by(role='admin').all()
-    admin_name = current_user.username
-
-    return render_template(
-        'admin_dashboard.html',
-        products=products,
-        inventories=inventories,
-        orders=orders,
-        user_role='admin',
-        search_query=search_query,
-        admins=admins,
-        admin_name=admin_name
-    )
-
-"""
 
 @app.route('/admin', methods=['GET', 'POST'])
 @login_required
@@ -857,19 +697,33 @@ def admin_dashboard():
         purchase_cost = getattr(product, 'purchase_cost', 0)  # cost to buy
         usage_cost = getattr(product, 'usage_cost', 0)       # other expenses
         order_list.append({
-            "product_name": product.name,
-            "identification_number": product.identification_number,
-            "in_stock": inventories.get(product.id).quantity_in_stock if inventories.get(product.id) else 0,
+            "product_name": product.name if product else "Unknown",
+            "identification_number": product.identification_number if product else "N/A",
+            "in_stock": inventories.get(product.id).quantity_in_stock if product and inventories.get(product.id) else 0,
             "quantity_sold": order.quantity,
             "selling_price": order.selling_price,
-            "amount": order.amount,
+            "amount": order.amount or 0,
             "purchase_cost": purchase_cost,
             "usage_cost": usage_cost,
-            "profit_loss": order.amount - (purchase_cost + usage_cost),
-            "seller": order.seller.username,
-            "location": order.location,
-            "date_sold": order.date_sold,
+            "profit_loss": (order.amount or 0) - (purchase_cost + usage_cost),
+            "seller": order.seller.username if order.seller else "Unknown",
+            "location": getattr(order, "location", "N/A"),
+            "date_sold": getattr(order, "date_sold", None),
         })
+
+    # -----------------------------
+    # Financial summary
+    # -----------------------------
+    bakeries = BakerInventory.query.filter_by(status='approved').all()
+
+    # fallback if model has no methods yet
+    def safe_attr(obj, attr, default=0):
+        return getattr(obj, attr, default) or 0
+
+    total_purchase_cost = sum(safe_attr(b, "total_purchase_cost") for b in bakeries)
+    total_usage_cost = sum(safe_attr(b, "total_usage_cost") for b in bakeries)
+    total_sales = sum(order["amount"] for order in order_list)
+    profit_loss = total_sales - (total_purchase_cost + total_usage_cost)
 
     admins = User.query.filter_by(role='admin').all()
     admin_name = current_user.username
@@ -878,12 +732,19 @@ def admin_dashboard():
         'admin_dashboard.html',
         products=products,
         inventories=inventories,
-        orders=order_list,  # <-- now includes purchase_cost, usage_cost, profit_loss
+        orders=order_list,
         user_role='admin',
         search_query=search_query,
         admins=admins,
-        admin_name=admin_name
+        admin_name=admin_name,
+
+        # ✅ pass summary values to template
+        total_sales=total_sales,
+        total_purchase_cost=total_purchase_cost,
+        total_usage_cost=total_usage_cost,
+        profit_loss=profit_loss
     )
+
 
 
 @app.route('/baker-inventory')
@@ -892,74 +753,6 @@ def baker_inventory_page():  # renamed function to avoid conflict
     # Pass seller info to template
     return render_template('baker_inventory.html', seller_details=current_user)
 
-
-"""
-@app.route('/admin/baker-inventory')
-@login_required
-def admin_baker_inventory_page():
-    inventory_list = baker_inventory.query.all()  # ✅ use the correct model
-    return render_template("admin_baker_inventory.html", inventory_list=inventory_list)
-
-"""
-
-
-
-"""
-@app.route('/send-baker-inventory', methods=['POST'])
-@login_required
-def send_baker_inventory():
-    data = request.get_json()
-    if not data:
-        return jsonify({"success": False, "error": "No data received"})
-
-    seller_id = data.get("seller_id")
-    ingredients = data.get("ingredients")
-
-    if not seller_id or not ingredients:
-        return jsonify({"success": False, "error": "Missing seller ID or ingredients"})
-
-    # Save to DB
-    try:
-        new_inventory = baker_inventory(
-            seller_id=seller_id,
-            ingredients=ingredients
-        )
-        db.session.add(new_inventory)
-        db.session.commit()
-        return jsonify({"success": True})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"success": False, "error": str(e)})
-
-
-
-@app.route('/send-baker-inventory', methods=['POST'])
-@login_required
-def send_baker_inventory():
-    data = request.get_json()
-    if not data:
-        return jsonify({"success": False, "error": "No data received"})
-
-    seller_id = data.get("seller_id")
-    breads = data.get("breads")  # ✅ match frontend key
-
-    if not seller_id or not breads:
-        return jsonify({"success": False, "error": "Missing seller ID or breads"}), 400
-
-    try:
-        new_inventory = baker_inventory(   # ✅ use your existing model
-            seller_id=seller_id,
-            ingredients=breads,            # save breads list inside JSON column
-            date_sent=datetime.utcnow()
-        )
-        db.session.add(new_inventory)
-        db.session.commit()
-        return jsonify({"success": True, "message": "Inventory saved successfully"})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({"success": False, "error": str(e)}), 500
-
-"""
 
 @app.route('/seller_dashboard', methods=['GET', 'POST'])
 @login_required
@@ -1307,56 +1100,6 @@ def select_order_location():
 
 
 
-"""
-@app.route('/view-baker-inventory')
-@login_required
-def view_baker_inventory():
-    submissions = baker_inventory.query.order_by(baker_inventory.date_sent.desc()).all()
-
-    def get_cost_per_unit(item_name):
-       
-        costs = {
-            "flour": 500,
-            "sugar": 300,
-            "yeast": 200,
-            "butter": 800,
-            "salt": 100,
-            "milk": 400,
-            "oil": 600,
-            "eggs": 100,
-            "water": 50,
-            "baking_powder": 350
-        }
-        return costs.get(item_name, 0)
-
-    inventory_list = []
-
-    for sub in submissions:
-        seller = db.session.get(User, sub.seller_id)  # modern SQLAlchemy
-        seller_name = seller.username if seller else "Unknown"
-
-        ingredients = []
-        for bread in sub.ingredients:  # each bread object from frontend
-            bread_type = bread.get("type", "Unknown")
-            for key, value in bread.items():
-                if key == "type":
-                    continue
-                ingredients.append({
-                    "bread_type": bread_type,
-                    "name": key,
-                    "qty": value,
-                    "cost": get_cost_per_unit(key)
-                })
-
-        inventory_list.append({
-            "seller_name": seller_name,
-            "date_sent": sub.date_sent.strftime("%Y-%m-%d %H:%M"),
-            "ingredients": ingredients
-        })
-
-    return render_template("admin_baker_inventory.html", inventory_list=inventory_list)
-
-"""
 
 
 @app.route('/admin/clear-inventories', methods=['POST'])
@@ -1374,9 +1117,6 @@ def clear_inventories():
 
 
 
-from collections import defaultdict
-from flask import render_template, request, redirect, url_for
-
 # Admin: View Orders
 @app.route('/admin/orders')
 def view_orders():
@@ -1384,32 +1124,31 @@ def view_orders():
     if not selected_location:
         return redirect(url_for('select_order_location'))
 
-    # ✅ FIXED: Now filter by Order.location instead of Product.location
+    # Filter orders
     orders = (
         Order.query
         .filter(Order.location.ilike(f"%{selected_location}%"))
         .all()
     )
 
-    # Prepare sales data for charts and top-seller calculation
+    # Collect data for charts and seller/product performance
     sales_data = []
     seller_performance = defaultdict(int)
     product_sales = defaultdict(int)
 
     for order in orders:
         sales_data.append({
-            "product_name": order.product.name,
-            "quantity_sold": order.quantity,
-            "total_price": order.amount,
+            "product_name": order.product.name if order.product else "Unknown",
+            "quantity_sold": order.quantity or 0,
+            "total_price": order.amount or 0,
             "sale_date": order.created_at.strftime("%Y-%m-%d") if order.created_at else None
         })
 
-        # Track seller performance
         if order.seller:
-            seller_performance[order.seller.id] += order.quantity
+            seller_performance[order.seller.id] += order.quantity or 0
 
-        # Track product sales
-        product_sales[order.product.name] += order.quantity
+        if order.product:
+            product_sales[order.product.name] += order.quantity or 0
 
     # Best seller
     if seller_performance:
@@ -1423,6 +1162,16 @@ def view_orders():
     # Top 5 products
     top_5_products = sorted(product_sales.items(), key=lambda x: x[1], reverse=True)[:5]
 
+    # ✅ Financial Summary (fixed)
+    bakeries = BakerInventory.query.filter_by(status='approved').all()
+
+    total_purchase_cost = sum(b.total_purchase_cost for b in bakeries)
+    total_usage_cost = sum(b.total_usage_cost for b in bakeries)  # 🔑 usage cost pulled same way
+    total_sales = sum(order.amount or 0 for order in orders)
+
+    # 🔥 Profit/Loss now based ONLY on usage cost
+    profit_loss = total_sales - total_usage_cost
+
     return render_template(
         'admin_orders.html',
         orders=orders,
@@ -1430,10 +1179,55 @@ def view_orders():
         sales_data=sales_data,
         best_seller_name=best_seller_name,
         best_seller_sales=best_seller_sales,
-        top_5_products=top_5_products
+        top_5_products=top_5_products,
+        total_sales=total_sales,
+        total_purchase_cost=total_purchase_cost,  # still shown separately
+        total_usage_cost=total_usage_cost,        # ✅ now displayed
+        profit_loss=profit_loss                   # ✅ uses usage cost only
     )
 
 
+
+
+@app.route('/export/financial-summary')
+def export_financial_summary():
+    from reportlab.lib.pagesizes import letter
+    from reportlab.pdfgen import canvas
+    import io
+    from flask import send_file
+
+    # Calculate totals
+    bakeries = BakerInventory.query.filter_by(status='approved').all()
+    orders = Order.query.all()
+
+    total_sales = sum(order.amount or 0 for order in orders)
+    total_purchase_cost = sum(b.total_purchase_cost for b in bakeries)
+    total_usage_cost = sum(b.total_usage_cost for b in bakeries)
+    profit_loss = total_sales - total_usage_cost
+
+    # Create PDF
+    buffer = io.BytesIO()
+    p = canvas.Canvas(buffer, pagesize=letter)
+
+    p.setFont("Helvetica-Bold", 14)
+    p.drawString(100, 750, "Financial Summary")
+
+    p.setFont("Helvetica", 12)
+    p.drawString(100, 720, f"Total Sales: ₦{total_sales:.2f}")
+    p.drawString(100, 700, f"Purchase Cost: ₦{total_purchase_cost:.2f}")
+    p.drawString(100, 680, f"Usage Cost: ₦{total_usage_cost:.2f}")
+    p.drawString(100, 660, f"Profit/Loss: ₦{profit_loss:.2f}")
+
+    p.showPage()
+    p.save()
+    buffer.seek(0)
+
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name="financial_summary.pdf",
+        mimetype="application/pdf"
+    )
 
 
 @app.route('/delete_all_products', methods=['POST'])
@@ -1627,7 +1421,7 @@ def send_baker_inventory():
         db.session.rollback()
         return jsonify({"success": False, "error": str(e)})
 
-
+"""
 
 @app.route('/admin/approve_inventory', methods=['POST'])
 @login_required
@@ -1640,6 +1434,52 @@ def approve_inventory():
     entry.status = "approved"
     db.session.commit()
     return jsonify({"success": True})
+"""
+@app.route('/admin/approve_inventory', methods=['POST'])
+@login_required
+def approve_inventory():
+    data = request.get_json() or {}
+    try:
+        submission_id = int(data.get("submission_id", 0))
+    except (TypeError, ValueError):
+        return jsonify({"success": False, "error": "Invalid submission_id"}), 400
+
+    entry = db.session.get(BakerInventory, submission_id)
+    if not entry:
+        return jsonify({"success": False, "error": "Entry not found"}), 404
+
+    # ✅ Update status
+    entry.status = "approved"
+    db.session.commit()
+
+    # ✅ Safely calculate costs
+    try:
+        purchase_cost = entry.total_purchase_cost or 0
+    except Exception as e:
+        print(f"⚠️ Error calculating purchase cost: {e}")
+        purchase_cost = 0
+
+    try:
+        usage_cost = entry.total_usage_cost or 0
+    except Exception as e:
+        print(f"⚠️ Error calculating usage cost: {e}")
+        usage_cost = 0
+
+    # 🔎 Debug logging
+    print(f"✅ Inventory ID {submission_id} approved")
+    print(f"   Purchases: {entry.purchases}")
+    print(f"   Breads: {entry.breads}")
+    print(f"   Total Purchase Cost: {purchase_cost}")
+    print(f"   Total Usage Cost: {usage_cost}")
+
+    # ✅ Always return valid JSON
+    return jsonify({
+        "success": True,
+        "id": submission_id,
+        "total_purchase_cost": purchase_cost,
+        "total_usage_cost": usage_cost
+    })
+
 
 
 @app.route('/admin/reject_inventory', methods=['POST'])
