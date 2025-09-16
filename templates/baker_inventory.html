@@ -146,7 +146,6 @@
                     <td class="px-2 py-2 text-center">
                       <input type="number" x-model.number="use.qty" min="0" class="w-24 p-2 border rounded-lg text-center"
                         :max="remainingFor(use.purchase_id)"
-                        @input="if (use.purchase_id && use.qty > remainingFor(use.purchase_id)) use.qty = remainingFor(use.purchase_id)"
                         aria-label="Quantity used" />
                     </td>
 
@@ -240,31 +239,50 @@ function bakerInventory(){
     // seller id injected from backend
     SELLER_ID: JSON.parse('{{ seller_details.id | tojson | safe }}'),
 
-    purchases: [],
-    breads: [],
+    // ===== STATE (load from localStorage) =====
+    purchases: JSON.parse(localStorage.getItem('purchases')) || [],
+    breads: JSON.parse(localStorage.getItem('breads')) || [],
     toast: { show: false, type: 'success', message: '' },
 
-    // generate unique id for local items
+    // ===== HELPERS =====
     nextId(){ return Date.now() + Math.floor(Math.random()*1000); },
+
+    saveState(){
+      localStorage.setItem('purchases', JSON.stringify(this.purchases));
+      localStorage.setItem('breads', JSON.stringify(this.breads));
+    },
 
     // ===== PURCHASES =====
     addPurchase(){
       this.purchases.push({ id: this.nextId(), name: '', qty: 0, unit: 'kg', cost: 0 });
+      this.saveState();
     },
     removePurchase(index){
       const removed = this.purchases.splice(index,1);
-      // remove from breads if used
       this.breads.forEach(b => b.ingredients.forEach(u => { 
         if (u.purchase_id === removed[0]?.id) u.purchase_id = null; 
       }));
+      this.saveState();
     },
 
     // ===== BREADS =====
-    addBread(){ this.breads.push({ id: this.nextId(), name: '', ingredients: [] }); },
-    removeBread(index){ this.breads.splice(index,1); },
+    addBread(){ 
+      this.breads.push({ id: this.nextId(), name: '', ingredients: [] }); 
+      this.saveState();
+    },
+    removeBread(index){ 
+      this.breads.splice(index,1); 
+      this.saveState();
+    },
 
-    addIngredientToBread(bIndex){ this.breads[bIndex].ingredients.push({ id: this.nextId(), purchase_id: null, qty: 0 }); },
-    removeIngredientFromBread(bIndex, uIndex){ this.breads[bIndex].ingredients.splice(uIndex,1); },
+    addIngredientToBread(bIndex){ 
+      this.breads[bIndex].ingredients.push({ id: this.nextId(), purchase_id: null, qty: 0 }); 
+      this.saveState();
+    },
+    removeIngredientFromBread(bIndex, uIndex){ 
+      this.breads[bIndex].ingredients.splice(uIndex,1); 
+      this.saveState();
+    },
 
     // ===== CALCULATIONS =====
     totalUsedByPurchaseId(purchaseId){
@@ -343,11 +361,15 @@ function bakerInventory(){
         for (const u of b.ingredients){
           if (!u.purchase_id) return { ok:false, msg: `Select an ingredient for bread "${b.name}".` };
           if (!u.qty || Number(u.qty) <= 0) return { ok:false, msg: `Enter a qty used for ingredient in bread "${b.name}".` };
-          const totalUsed = this.totalUsedByPurchaseId(u.purchase_id);
+
+          // ✅ Fix: allow full usage (equal to purchased qty)
           const p = this.purchases.find(x => x.id === u.purchase_id);
           if (p){
-            const available = Number(p.qty) - (Number(totalUsed) - Number(u.qty || 0));
-            if (Number(u.qty) > Number(available)) return { ok:false, msg: `Not enough "${p.name}" available for bread "${b.name}". Remaining: ${available} ${p.unit}` };
+            const alreadyUsed = this.totalUsedByPurchaseId(u.purchase_id) - Number(u.qty || 0);
+            const available = Number(p.qty) - alreadyUsed;
+            if (Number(u.qty) > available) {
+              return { ok:false, msg: `Not enough "${p.name}" available for bread "${b.name}". Remaining: ${available} ${p.unit}` };
+            }
           }
         }
       }
@@ -371,7 +393,7 @@ function bakerInventory(){
               name: purchase.name || '',
               unit: purchase.unit || '',
               qty: u.qty,
-              cost: Number(this.calculateUsageCost(u)) // <--- send usage cost
+              cost: Number(this.calculateUsageCost(u))
             };
           })
         })),
@@ -390,8 +412,32 @@ function bakerInventory(){
       })
       .then(res => res.json())
       .then(json => { 
-        if (json && json.success) this.showToast('Inventory submitted to admin.', 'success'); 
-        else this.showToast(json.error || 'Server error while submitting.', 'error'); 
+        if (json && json.success) {
+          // --- NEW BEHAVIOR: subtract used qty from purchases and retain remaining ---
+          // snapshot original quantities and costs before changing them
+          const snapshot = this.purchases.map(p => ({ id: p.id, qty: Number(p.qty) || 0, cost: Number(p.cost) || 0 }));
+
+          const updatedPurchases = this.purchases.map(p => {
+            const snap = snapshot.find(s => s.id === p.id) || { qty: 0, cost: 0 };
+            const used = this.totalUsedByPurchaseId(p.id);
+            const originalQty = snap.qty;
+            const originalCost = snap.cost;
+            const unitCost = originalQty ? (originalCost / originalQty) : 0;
+            const remainingQty = Math.max(0, originalQty - used);
+            const remainingCost = Number((remainingQty * unitCost).toFixed(2));
+            return { ...p, qty: remainingQty, cost: remainingCost };
+          });
+
+          this.purchases = updatedPurchases;
+          // clear bread usage lines (they were submitted)
+          this.breads = [];
+          // persist the new state (remaining stock retained)
+          this.saveState();
+
+          this.showToast('Inventory submitted to admin. Remaining stock retained.', 'success');
+        } else {
+          this.showToast(json && json.error ? json.error : 'Server error while submitting.', 'error'); 
+        }
       })
       .catch(err => { 
         console.error(err); 
@@ -416,6 +462,7 @@ function bakerInventory(){
         { id: this.nextId(), name: 'Yeast', qty: 1, unit: 'kg', cost: 800 },
       ];
       this.breads = [];
+      this.saveState();
     }
   }
 }
