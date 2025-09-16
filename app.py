@@ -1254,20 +1254,20 @@ def delete_user(user_id):
         return redirect(url_for('view_users'))
 
     try:
-        # Delete all inventory for this user
-        inventories = baker_inventory.query.filter_by(seller_id=user.id).all()
+        # Delete all BakerInventory records for this user
+        inventories = BakerInventory.query.filter_by(seller_id=user.id).all()
         for inv in inventories:
             db.session.delete(inv)
 
-        # Delete all orders from this user (if any)
+        # Delete all orders for this user
         orders = Order.query.filter_by(seller_id=user.id).all()
         for order in orders:
             db.session.delete(order)
 
-        # Now delete the user
+        # Delete the user
         db.session.delete(user)
 
-        # Commit everything
+        # Commit all deletions
         db.session.commit()
         flash(f"User {user.username} and related data deleted successfully.", "success")
     except Exception as e:
