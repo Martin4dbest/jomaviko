@@ -157,6 +157,16 @@ class Message(db.Model):
     sender = db.relationship('User', foreign_keys=[sender_id], passive_deletes=True)
     receiver = db.relationship('User', foreign_keys=[receiver_id], passive_deletes=True)
 
+
+
+from datetime import datetime, timezone
+import pytz
+
+utc_time = datetime.now(timezone.utc)
+local_tz = pytz.timezone('Africa/Lagos')  # adjust to your timezone
+local_time = utc_time.astimezone(local_tz)
+date_sent_str = local_time.strftime("%Y-%m-%d %H:%M:%S")
+
 """
 class BakerInventory(db.Model):  
     __tablename__ = "baker_inventory"   # explicitly set table name
@@ -1374,6 +1384,12 @@ def admin_baker_inventory():
 
 
 # 1️⃣ Admin view route (GET)
+
+from datetime import timezone
+import pytz
+
+local_tz = pytz.timezone("Africa/Lagos")  # adjust to your timezone
+
 @app.route('/view-baker-inventory')
 @login_required
 def view_baker_inventory():
@@ -1382,10 +1398,14 @@ def view_baker_inventory():
 
     for sub in submissions:
         seller = sub.seller.username if sub.seller else "Unknown"
+        # Convert UTC to local
+        utc_dt = sub.date_sent.replace(tzinfo=timezone.utc)
+        local_dt = utc_dt.astimezone(local_tz)
+        
         inventory_list.append({
-            "id": sub.id,  # ← use integer DB id here
+            "id": sub.id,
             "seller_name": seller,
-            "date_sent": sub.date_sent.strftime("%Y-%m-%d %H:%M"),
+            "date_sent": local_dt.strftime("%Y-%m-%d %H:%M"),  # now local time
             "purchases": sub.purchases,
             "breads": sub.breads
         })
