@@ -1453,6 +1453,7 @@ def delete_all_products():
 
 
 @app.route('/delete_user/<int:user_id>', methods=['POST'])
+@login_required
 def delete_user(user_id):
     user = User.query.get(user_id)
     if not user:
@@ -1460,25 +1461,22 @@ def delete_user(user_id):
         return redirect(url_for('view_users'))
 
     try:
-        # Delete all BakerInventory records for this user
-        inventories = BakerInventory.query.filter_by(seller_id=user.id).all()
-        for inv in inventories:
-            db.session.delete(inv)
+        # Delete related BakerInventory
+        BakerInventory.query.filter_by(seller_id=user.id).delete()
 
-        # Delete all orders for this user
-        orders = Order.query.filter_by(seller_id=user.id).all()
-        for order in orders:
-            db.session.delete(order)
+        # Delete related Orders
+        Order.query.filter_by(seller_id=user.id).delete()
+
+        # Delete related CreditSales
+        CreditSale.query.filter_by(seller_id=user.id).delete()
 
         # Delete the user
         db.session.delete(user)
-
-        # Commit all deletions
         db.session.commit()
         flash(f"User {user.username} and related data deleted successfully.", "success")
     except Exception as e:
         db.session.rollback()
-        flash("Error deleting user: " + str(e), "danger")
+        flash(f"Error deleting user: {e}", "danger")
 
     return redirect(url_for('view_users'))
 
