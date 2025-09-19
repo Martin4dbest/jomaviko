@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📒 Record Customer Credit</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 text-gray-800">
+  <div class="max-w-4xl mx-auto p-4 sm:p-6">
+    
+    <h1 class="text-2xl sm:text-3xl font-bold text-red-600 mb-6">📒 Record Customer Credit</h1>
+
+    <!-- Form -->
+    <form method="POST" class="bg-white shadow-lg rounded-xl p-4 sm:p-6 space-y-4 mb-6">
+      <div>
+        <label class="block font-semibold">Customer Name</label>
+        <input type="text" name="customer_name" required class="w-full p-2 border rounded-lg">
+      </div>
+
+      <div>
+        <label class="block font-semibold">Customer Phone Number (Optional)</label>
+        <input type="tel" name="customer_phone" placeholder="e.g. 08012345678" class="w-full p-2 border rounded-lg">
+      </div>
+
+      <div>
+        <label class="block font-semibold">Bread Type</label>
+        <input type="text" name="bread_type" placeholder="E.g. Agege, Wheat, Sliced" required class="w-full p-2 border rounded-lg">
+      </div>
+
+      <div>
+        <label class="block font-semibold">Number Bought</label>
+        <input type="number" name="quantity" min="1" required class="w-full p-2 border rounded-lg">
+      </div>
+
+      <div>
+        <label class="block font-semibold">Amount Owing (₦)</label>
+        <input type="number" name="amount_owing" min="0" step="0.01" required class="w-full p-2 border rounded-lg">
+      </div>
+
+      <button type="submit" class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg shadow">
+        💾 Save Record
+      </button>
+    </form>
+
+    <!-- Records Table -->
+    <div class="bg-white shadow-lg rounded-xl p-4 sm:p-6 overflow-x-auto">
+      <h2 class="text-xl font-bold mb-4">📊 Credit Records</h2>
+      <table class="min-w-full border border-gray-300 text-sm sm:text-base">
+        <thead class="bg-gray-200">
+          <tr>
+            <th class="px-2 sm:px-4 py-2">Customer</th>
+            <th class="px-2 sm:px-4 py-2">Phone</th>
+            <th class="px-2 sm:px-4 py-2">Bread Type</th>
+            <th class="px-2 sm:px-4 py-2">Qty</th>
+            <th class="px-2 sm:px-4 py-2">Amount Owing (₦)</th>
+            <th class="px-2 sm:px-4 py-2">Date/Time</th>
+            <th class="px-2 sm:px-4 py-2">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sale in sales %}
+          <tr class="border-b hover:bg-gray-50 text-center">
+            <td class="px-2 sm:px-4 py-2">{{ sale.customer_name }}</td>
+            <td class="px-2 sm:px-4 py-2">{{ sale.customer_phone if sale.customer_phone else '-' }}</td>
+            <td class="px-2 sm:px-4 py-2">{{ sale.bread_type }}</td>
+            <td class="px-2 sm:px-4 py-2">{{ sale.quantity }}</td>
+            <td class="px-2 sm:px-4 py-2 font-semibold {% if sale.fully_paid %}text-green-600{% else %}text-red-600{% endif %}">
+              ₦{{ "%.2f"|format(sale.amount_owing) }}{% if sale.fully_paid %} (Paid) {% endif %}
+            </td>
+            <td class="px-2 sm:px-4 py-2">{{ sale.date_time.strftime("%Y-%m-%d %H:%M") }}</td>
+            <td class="px-2 sm:px-4 py-2">
+              {% if not sale.fully_paid %}
+              <form method="POST" action="{{ url_for('update_credit_sale', sale_id=sale.id) }}" class="flex space-x-2 justify-center">
+                <input type="number" name="amount_owing" min="0" step="0.01" value="{{ sale.amount_owing }}" class="p-1 border rounded w-20">
+                <button type="submit" class="bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded">Update</button>
+              </form>
+              {% else %}
+                <span class="text-green-600 font-semibold">Paid Full</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="7" class="text-gray-500 py-4">No credit sales recorded yet.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>

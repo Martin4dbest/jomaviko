@@ -32,11 +32,23 @@ app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
     "pool_timeout": 30
 }
 
+
+from datetime import timedelta
+
+# Make sessions last longer
+app.permanent_session_lifetime = timedelta(hours=5)
+
+
 # Initialize database
 db = SQLAlchemy(app)
 
 # Initialize Flask-Login
 login_manager = LoginManager(app)
+
+login_manager.login_view = "login"               # endpoint to redirect unauthenticated users
+login_manager.login_message_category = "danger" # flash message category
+login_manager.session_protection = "strong"     # adds extra security to sessions
+
 
 # Initialize Flask-Migrate
 migrate = Migrate(app, db)
@@ -121,7 +133,7 @@ class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), nullable=False, unique=True)
     password = db.Column(db.String(256), nullable=False)
-    role = db.Column(db.String(50), nullable=False)  # "admin" or "seller"
+    role = db.Column(db.String(50), nullable=False, default="seller")   # seller | admin | baker
     location = db.Column(db.String(100), nullable=True)
 
 
@@ -222,6 +234,30 @@ class BakerInventory(db.Model):
                 total += ing.get("usage_cost", ing.get("cost", 0)) or 0
 
         return total
+
+
+from datetime import datetime
+
+class CreditSale(db.Model):
+    __tablename__ = 'credit_sale'  # optional but good practice
+
+    id = db.Column(db.Integer, primary_key=True)
+    customer_name = db.Column(db.String(150), nullable=False)
+    customer_phone = db.Column(db.String(20), nullable=True)  # optional
+    
+    bread_type = db.Column(db.String(100), nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    amount_owing = db.Column(db.Float, nullable=False)
+    date_time = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    # ForeignKey to User table (seller)
+    seller_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    seller = db.relationship('User', backref=db.backref('credit_sales', lazy=True))
+
+    fully_paid = db.Column(db.Boolean, default=False, nullable=False)
+
+    def __repr__(self):
+        return f"<CreditSale {self.customer_name} - {self.bread_type} - ₦{self.amount_owing}>"
 
 
 
@@ -756,19 +792,112 @@ def admin_dashboard():
     )
 
 
-
+"""
 @app.route('/baker-inventory')
 @login_required
 def baker_inventory_page():  # renamed function to avoid conflict
     # Pass seller info to template
     return render_template('baker_inventory.html', seller_details=current_user)
+"""
+
+@app.route("/baker-inventory")
+@login_required
+def baker_inventory_page():
+    if current_user.role != "baker":
+        flash("🚫 You don’t have permission to access the Bakery Inventory.", "error")
+        return redirect(url_for("seller_dashboard"))
+
+    # 👇 Pass current_user as seller_details
+    return render_template("baker_inventory.html", seller_details=current_user)
+
+
+@app.route("/credit-sales", methods=["GET", "POST"])
+@login_required
+def credit_sales():
+    # No role restriction, allow all logged-in users
+    if request.method == "POST":
+        sale_id = request.form.get("sale_id")
+        customer_name = request.form.get("customer_name")
+        customer_phone = request.form.get("customer_phone")  # optional
+        bread_type = request.form.get("bread_type")
+        quantity = request.form.get("quantity")
+        amount_owing = float(request.form.get("amount_owing"))
+
+        if sale_id:  # updating existing record
+            sale = CreditSale.query.get(int(sale_id))
+            if sale and sale.seller_id == current_user.id:
+                sale.amount_owing = amount_owing
+                if customer_phone is not None:
+                    sale.customer_phone = customer_phone
+                sale.fully_paid = amount_owing <= 0
+                db.session.commit()
+                flash("Record updated successfully!", "success")
+        else:  # creating new record
+            new_sale = CreditSale(
+                customer_name=customer_name,
+                customer_phone=customer_phone,
+                bread_type=bread_type,
+                quantity=int(quantity),
+                amount_owing=amount_owing,
+                seller_id=current_user.id
+            )
+            db.session.add(new_sale)
+            db.session.commit()
+            flash("New credit record saved!", "success")
+
+    sales = CreditSale.query.filter_by(seller_id=current_user.id).order_by(CreditSale.date_time.desc()).all()
+    return render_template("credit_sales.html", sales=sales)
+
+
+@app.route("/admin/credit-sales")
+@login_required
+def admin_credit_sales():
+    # Remove admin check, allow all logged-in users to view
+    sales = CreditSale.query.order_by(CreditSale.date_time.desc()).all()
+    return render_template("admin_credit_sales.html", sales=sales)
+
+
+@app.route("/update-credit-sale/<int:sale_id>", methods=["POST"])
+@login_required
+def update_credit_sale(sale_id):
+    sale = CreditSale.query.get_or_404(sale_id)
+    new_amount = float(request.form["amount_owing"])
+    new_phone = request.form.get("customer_phone")  # optional
+    sale.amount_owing = new_amount
+    if new_phone is not None:
+        sale.customer_phone = new_phone
+    sale.fully_paid = new_amount <= 0
+    db.session.commit()
+    flash("Record updated successfully!", "success")
+    return redirect(url_for("credit_sales"))
+
+
+@app.route("/delete-credit-sale/<int:sale_id>", methods=["POST"])
+@login_required
+def delete_credit_sale(sale_id):
+    sale = CreditSale.query.get_or_404(sale_id)
+
+    # Only delete if fully paid
+    if not sale.fully_paid:
+        flash("Debt not cleared yet.", "danger")
+        # Always stay on admin page
+        return redirect(url_for("admin_credit_sales"))
+
+    db.session.delete(sale)
+    db.session.commit()
+    flash("Cleared debt record successfully!", "success")
+
+    # Always redirect back to admin credit sales page
+    return redirect(url_for("admin_credit_sales"))
+
+
 
 
 @app.route('/seller_dashboard', methods=['GET', 'POST'])
 @login_required
 def seller_dashboard():
     if current_user.role != 'seller':
-        return redirect(url_for('login'))
+        return redirect(url_for('/login'))
 
     # Fetch only products matching seller's location
     products = Product.query.filter_by(location=current_user.location).all()
@@ -791,7 +920,6 @@ def seller_dashboard():
         for product in products:
             selling_price = request.form.get(f'selling_price_{product.id}')
             quantity = request.form.get(f'quantity_{product.id}', 0)
-
             if selling_price and quantity:
                 selling_price = float(selling_price)
                 quantity = int(quantity)
@@ -827,24 +955,38 @@ def seller_dashboard():
     )
 
 
+import time
+start = time.time()
 
-# Route for user login
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        username = request.form['username']
+        username = request.form['username'].strip()
         password = request.form['password']
         user = User.query.filter_by(username=username).first()
+
         if user and check_password_hash(user.password, password):
-            login_user(user)
+            login_user(user, remember=True)  # keep session alive
+            session.permanent = True          # make session permanent
+
             flash('Login successful!', 'success')
-            return redirect(url_for('admin_dashboard') if user.role == 'admin' else url_for('seller_dashboard'))
-        else:
-            flash('Invalid login credentials', 'danger')
+
+            # Redirect user based on role
+            if user.role.lower() == 'admin':
+                return redirect(url_for('admin_dashboard'))
+            elif user.role.lower() == 'seller':
+                return redirect(url_for('seller_dashboard'))
+            elif user.role.lower() == 'baker':
+                return redirect(url_for('baker_inventory_page'))
+
+            return redirect(url_for('index'))  # fallback
+
+        flash('Invalid login credentials', 'danger')
+
     return render_template('login.html')
 
 
-
+print("Login took", time.time() - start, "seconds")
 
 
 @app.route('/admin/change-password', methods=['GET', 'POST'])
@@ -935,7 +1077,7 @@ def place_order(product_id):
 
     return redirect(url_for('seller_dashboard'))
 
-
+"""
 @app.route('/register', methods=['GET', 'POST'])
 @login_required
 def register():
@@ -986,6 +1128,60 @@ def register():
         return redirect(url_for('admin_dashboard'))
 
     return render_template('register.html', ghana_cities=ghana_cities)
+
+"""
+@app.route("/register", methods=["GET", "POST"])
+@login_required
+def register():
+    if current_user.role != "admin":
+        flash("Access denied. Only admins can register new users.", "danger")
+        return redirect(url_for("login"))
+
+    ghana_cities = ["Ikota", "Ajah", "Badore"]
+
+    if request.method == "POST":
+        username = request.form["username"].strip()
+        password = request.form["password"]
+        role = request.form["role"].strip().lower()
+        location_input = request.form.get("location", "").strip()
+
+        print("📌 DEBUG: Received data →", username, role, location_input)
+
+        # Normalize location
+        if "ikota" in location_input.lower():
+            normalized_location = "Ikota"
+        else:
+            normalized_location = location_input
+
+        print("📌 DEBUG: Normalized location →", normalized_location)
+
+        if normalized_location not in ghana_cities:
+            print("❌ Invalid location")
+            flash("Invalid location specified.", "danger")
+            return redirect(url_for("register"))
+
+        if role not in ["seller", "admin", "baker"]:
+            print("❌ Invalid role")
+            flash("Invalid role specified.", "danger")
+            return redirect(url_for("register"))
+
+        existing_user = User.query.filter_by(username=username).first()
+        if existing_user:
+            print("❌ Username exists already")
+            flash("Username already exists!", "danger")
+            return redirect(url_for("register"))
+
+        hashed_password = generate_password_hash(password, method="pbkdf2:sha256")
+        new_user = User(username=username, password=hashed_password, role=role, location=normalized_location)
+        db.session.add(new_user)
+        db.session.commit()
+
+        print("✅ User registered successfully →", username, role, normalized_location)
+
+        flash(f"{username} registered successfully as {role} in {normalized_location}!", "success")
+        return redirect(url_for("admin_dashboard"))
+
+    return render_template("register.html", ghana_cities=ghana_cities)
 
 
 

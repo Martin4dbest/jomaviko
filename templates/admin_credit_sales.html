@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>📒 Customer Credit Records</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 text-gray-900">
+  <div class="max-w-6xl mx-auto p-4 sm:p-6">
+
+    <!-- Back arrow to admin dashboard -->
+    <div class="mb-4">
+      <a href="{{ url_for('admin_dashboard') }}" class="inline-flex items-center text-gray-700 hover:text-gray-900">
+        <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+        Back to Dashboard
+      </a>
+    </div>
+
+    <h1 class="text-2xl sm:text-3xl font-bold text-red-600 mb-6">📒 Customer Credit Records</h1>
+
+    {% if sales %}
+    <div class="overflow-x-auto bg-white shadow-md rounded-xl">
+      <table class="min-w-full border border-gray-200 text-sm sm:text-base">
+        <thead class="bg-red-500 text-white">
+          <tr>
+            <th class="px-2 sm:px-4 py-2 text-left">Customer</th>
+            <th class="px-2 sm:px-4 py-2 text-left">Phone</th>
+            <th class="px-2 sm:px-4 py-2 text-left">Bread Type</th>
+            <th class="px-2 sm:px-4 py-2 text-center">Qty</th>
+            <th class="px-2 sm:px-4 py-2 text-right">Amount Owing (₦)</th>
+            <th class="px-2 sm:px-4 py-2 text-left">Date/Time</th>
+            <th class="px-2 sm:px-4 py-2 text-center">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sale in sales %}
+          <tr class="border-b hover:bg-gray-50">
+            <td class="px-2 sm:px-4 py-2">{{ sale.customer_name }}</td>
+            <td class="px-2 sm:px-4 py-2">{{ sale.customer_phone if sale.customer_phone else '-' }}</td>
+            <td class="px-2 sm:px-4 py-2">{{ sale.bread_type }}</td>
+            <td class="px-2 sm:px-4 py-2 text-center">{{ sale.quantity }}</td>
+            <td class="px-2 sm:px-4 py-2 text-right font-semibold {% if sale.fully_paid %}text-green-600{% else %}text-red-600{% endif %}">
+              ₦{{ "%.2f"|format(sale.amount_owing) }}{% if sale.fully_paid %} (Paid) {% endif %}
+            </td>
+            <td class="px-2 sm:px-4 py-2">{{ sale.date_time.strftime("%Y-%m-%d %H:%M") }}</td>
+            <td class="px-2 sm:px-4 py-2 text-center">
+              {% if sale.fully_paid %}
+              <form method="POST" action="{{ url_for('delete_credit_sale', sale_id=sale.id) }}">
+                <button type="submit" class="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded">
+                  Clear
+                </button>
+              </form>
+              {% else %}
+                <span class="text-gray-500">Pending</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+      <p class="text-gray-600 italic mt-4">No customer credit records found.</p>
+    {% endif %}
+
+  </div>
+
+  <!-- Auto-refresh every 5 seconds -->
+  <script>
+    setInterval(() => {
+      fetch("{{ url_for('admin_credit_sales') }}")
+        .then(response => response.text())
+        .then(html => {
+          // Replace only the table div, to prevent full page reload
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(html, 'text/html');
+          const newTable = doc.querySelector('.overflow-x-auto');
+          const oldTable = document.querySelector('.overflow-x-auto');
+          if(newTable && oldTable) {
+            oldTable.replaceWith(newTable);
+          }
+        });
+    }, 5000);
+  </script>
+</body>
+</html>
