@@ -1080,15 +1080,19 @@ def change_password():
     return render_template('change_password.html')
 
 
+from flask_login import login_required, logout_user, current_user
+from flask import flash, redirect, url_for
 
-
-# Route for user logout
-@app.route('/logout')
 @login_required
+@app.route('/logout')
 def logout():
+    # ✅ No UserActivity needed anymore
+
+    # Log the user out
     logout_user()
-    flash('You have been logged out.', 'info')
-    return redirect(url_for('index'))
+    flash("Logged out successfully", "success")
+    return redirect(url_for("index"))
+
 
 
 @app.route('/order/<int:product_id>', methods=['POST'])
