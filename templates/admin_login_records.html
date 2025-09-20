@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login Records</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 font-sans">
+
+    <main class="p-6">
+        <div class="max-w-5xl mx-auto bg-white p-6 rounded-lg shadow-lg">
+            
+            <!-- Back arrow -->
+            <a href="{{ url_for('admin_dashboard') }}" class="inline-flex items-center text-gray-600 hover:text-gray-900 mb-4">
+                ← Back to Dashboard
+            </a>
+
+            <h2 class="text-2xl font-semibold mb-6 text-gray-800">Login Records</h2>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full border border-gray-200 rounded-lg">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th class="py-3 px-4 text-left text-gray-700 font-medium">Username</th>
+                            <th class="py-3 px-4 text-left text-gray-700 font-medium">Role</th>
+                            <th class="py-3 px-4 text-left text-gray-700 font-medium">Login Time</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in records %}
+                        <tr class="border-b hover:bg-gray-50 transition duration-150">
+                            <td class="py-2 px-4">{{ record.username }}</td>
+                            <td class="py-2 px-4 capitalize">{{ record.role }}</td>
+                            <td class="py-2 px-4">{{ record.login_time }}</td>
+                        </tr>
+                        {% endfor %}
+                        {% if records|length == 0 %}
+                        <tr>
+                            <td colspan="3" class="py-4 px-4 text-center text-gray-400">
+                                No login records found.
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+
+            <form method="post" action="{{ url_for('clear_login_records') }}" class="mt-6 flex justify-end">
+                <button type="submit" class="px-5 py-2 bg-gray-800 text-white rounded hover:bg-gray-900 transition duration-200">
+                    Clear Records
+                </button>
+            </form>
+        </div>
+    </main>
+
+</body>
+</html>

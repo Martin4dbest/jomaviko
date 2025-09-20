@@ -261,6 +261,7 @@ class CreditSale(db.Model):
 
 
 
+
 import pandas as pd
 from io import BytesIO
 from flask import send_file
@@ -957,7 +958,7 @@ def seller_dashboard():
 
 import time
 start = time.time()
-
+"""
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -987,6 +988,74 @@ def login():
 
 
 print("Login took", time.time() - start, "seconds")
+"""
+
+import pytz
+from datetime import datetime
+
+# Simple in-memory login tracker
+login_records = []
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username'].strip()
+        password = request.form['password']
+        user = User.query.filter_by(username=username).first()
+
+        if user and check_password_hash(user.password, password):
+            login_user(user, remember=True)
+            session.permanent = True
+
+            flash('Login successful!', 'success')
+
+            # ✅ Log login in memory with Lagos time
+            lagos_tz = pytz.timezone("Africa/Lagos")
+            local_time = datetime.now(lagos_tz).strftime("%Y-%m-%d %H:%M:%S")
+
+            login_records.append({
+                "username": user.username,
+                "role": user.role,
+                "login_time": local_time
+            })
+
+            # Redirect based on role
+            if user.role.lower() == 'admin':
+                return redirect(url_for('admin_dashboard'))
+            elif user.role.lower() == 'seller':
+                return redirect(url_for('seller_dashboard'))
+            elif user.role.lower() == 'baker':
+                return redirect(url_for('baker_inventory_page'))
+
+            return redirect(url_for('index'))
+
+        flash('Invalid login credentials', 'danger')
+
+    return render_template('login.html')
+
+
+@app.route('/admin/login-records')
+@login_required
+def admin_login_records():
+    if current_user.role.lower() != 'admin':
+        flash("Access denied", "danger")
+        return redirect(url_for("index"))
+
+    return render_template("admin_login_records.html", records=login_records)
+
+
+@app.route('/admin/clear-login-records', methods=['POST'])
+@login_required
+def clear_login_records():
+    if current_user.role.lower() != 'admin':
+        flash("Access denied", "danger")
+        return redirect(url_for("index"))
+
+    login_records.clear()
+    flash("Login records cleared!", "success")
+    return redirect(url_for("admin_login_records"))
+
+
 
 
 @app.route('/admin/change-password', methods=['GET', 'POST'])
