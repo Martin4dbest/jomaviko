@@ -375,97 +375,117 @@
     renderPage(1);
 
     // --- Totals button ---
-    // --- Totals button ---
     const showTotalsBtn = document.getElementById('showTotalsBtn');
     const totalsContainer = document.getElementById('totalsContainer');
     const totalQuantityEl = document.getElementById('totalQuantity');
     const totalAmountEl = document.getElementById('totalAmount');
     const totalPurchaseEl = document.getElementById('totalPurchase');
-    const totalUsageEl = document.getElementById('totalUsageCost'); 
-    const totalProfitEl = document.getElementById('totalProfit');   
+    const totalUsageEl = document.getElementById('totalUsageCost');
+    const totalProfitEl = document.getElementById('totalProfit');
 
-    // === INSERTED: calculateWithUtilities listener (from your snippet) ===
-    document.getElementById('calculateWithUtilities')?.addEventListener('click', () => {
-        const gasCost = parseFloat(document.getElementById('adminGasCost').value) || 0;
-        const electricityCost = parseFloat(document.getElementById('adminElectricityCost').value) || 0;
-
-        const totalUsageEl = document.getElementById('totalUsageCost');
-        const totalProfitEl = document.getElementById('totalProfit');
-        const totalAmountEl = document.getElementById('totalAmount');
-        const totalPurchaseEl = document.getElementById('totalPurchase');
-
-        // Convert displayed totals to numbers
-        const totalSales = parseFloat(totalAmountEl.textContent) || 0;
-        const totalPurchase = parseFloat(totalPurchaseEl.textContent) || 0;
-
-        // Total usage includes current usage plus manual input
-        const totalUsage = gasCost + electricityCost;
-        totalUsageEl.textContent = totalUsage.toFixed(2);
-
-        // Profit/Loss = Sales - (Purchase + Usage)
-        const profitLoss = totalSales - (totalPurchase + totalUsage);
-        totalProfitEl.textContent = profitLoss.toFixed(2);
-    });
-    // === END INSERT ===
-
-    function calculateTotals() {
-        let totalQuantity = 0;
-        let totalAmount = 0;
-        let totalPurchase = 0;
-        let totalUsage = 0;
-        let totalProfitLoss = 0;
-
-        // Only visible rows on the current page
-        const visibleRows = Array.from(tbody.querySelectorAll('tr.data-row'));
-
-        visibleRows.forEach(row => {
-            const cells = row.children;
-
-            const qty = parseInt(cells[3].textContent.trim(), 10) || 0;
-            const amt = parseFloat(cells[5].textContent.trim()) || 0;
-            const purchase = parseFloat(cells[5].dataset.purchaseCost) || 0;
-            const usage = parseFloat(cells[5].dataset.usageCost) || 0;
-            const profitLoss = amt - (purchase + usage);
-
-
-
-            totalQuantity += qty;
-            totalAmount += amt;
-            totalPurchase += purchase;
-            totalUsage += usage;
-            totalProfitLoss += profitLoss;
-        });
-
-        totalQuantityEl.textContent = totalQuantity;
-        totalAmountEl.textContent = totalAmount.toFixed(2);
-        totalPurchaseEl.textContent = totalPurchase.toFixed(2);
-        totalUsageEl.textContent = totalUsage.toFixed(2);
-        totalProfitEl.textContent = totalProfitLoss.toFixed(2);
+    // Helper: parse numeric string robustly (strip commas/currency)
+    function parseNumberSafe(str) {
+      if (str === null || str === undefined) return 0;
+      const cleaned = String(str).replace(/[^0-9.-]+/g, '');
+      return parseFloat(cleaned) || 0;
     }
 
-    showTotalsBtn.addEventListener('click', () => {
-        if (totalsContainer.style.display === 'none' || totalsContainer.style.display === '') {
-            calculateTotals();
-            totalsContainer.style.display = 'block';
-            showTotalsBtn.textContent = 'Hide Totals';
-            showTotalsBtn.classList.remove('bg-green-600');
-            showTotalsBtn.classList.add('bg-brown-600');
-            showTotalsBtn.style.backgroundColor = 'brown';
-        } else {
-            totalsContainer.style.display = 'none';
-            showTotalsBtn.textContent = 'Show Totals';
-            showTotalsBtn.style.backgroundColor = '';
-            showTotalsBtn.classList.add('bg-green-600');
+    // calculateTotals: computes totals from visible rows, updates DOM, and returns an object
+    function calculateTotals() {
+      let totalQuantity = 0;
+      let totalAmount = 0;
+      let totalPurchase = 0;
+      let totalUsage = 0;
+      let totalProfitLoss = 0;
+
+      // Only visible rows on the current page
+      const visibleRows = Array.from(tbody.querySelectorAll('tr.data-row'));
+
+      visibleRows.forEach(row => {
+        // read values robustly
+        const qty = parseInt(row.querySelector('.orderQty')?.textContent.trim(), 10) || 0;
+        const amt = parseNumberSafe(row.querySelector('.orderAmount')?.textContent) || 0;
+
+        // purchase & usage are stored on the <tr> as data-* attributes
+        const purchase = parseNumberSafe(row.dataset.purchaseCost || row.getAttribute('data-purchase-cost')) || 0;
+        const usage = parseNumberSafe(row.dataset.usageCost || row.getAttribute('data-usage-cost')) || 0;
+
+        const profitLoss = amt - (purchase + usage);
+
+        totalQuantity += qty;
+        totalAmount += amt;
+        totalPurchase += purchase;
+        totalUsage += usage;
+        totalProfitLoss += profitLoss;
+      });
+
+      // Update DOM (numbers only — currency symbol is in HTML display)
+      totalQuantityEl.textContent = totalQuantity;
+      totalAmountEl.textContent = totalAmount.toFixed(2);
+      totalPurchaseEl.textContent = totalPurchase.toFixed(2);
+      totalUsageEl.textContent = totalUsage.toFixed(2);
+      totalProfitEl.textContent = totalProfitLoss.toFixed(2);
+
+      return {
+        totalQuantity,
+        totalAmount,
+        totalPurchase,
+        totalUsage,
+        totalProfitLoss
+      };
+    }
+
+    // Calculate with manual utilities: ensure totals are up-to-date first
+    document.getElementById('calculateWithUtilities')?.addEventListener('click', () => {
+      // Recompute totals from visible rows
+      const totals = calculateTotals(); // now returns totals and updates DOM
+
+      // Read manual utility inputs (numbers)
+      const gasCost = parseNumberSafe(document.getElementById('adminGasCost')?.value) || 0;
+      const electricityCost = parseNumberSafe(document.getElementById('adminElectricityCost')?.value) || 0;
+
+      // Combined usage = existing usage (from rows) + manual inputs
+      const combinedUsage = (totals.totalUsage || 0) + gasCost + electricityCost;
+
+      // Update usage display and compute profit
+      totalUsageEl.textContent = combinedUsage.toFixed(2);
+
+      const profitLoss = (totals.totalAmount || 0) - ((totals.totalPurchase || 0) + combinedUsage);
+      totalProfitEl.textContent = profitLoss.toFixed(2);
+
+      // If totals panel is hidden, show it so user sees the updated numbers
+      if (totalsContainer && (totalsContainer.style.display === 'none' || totalsContainer.style.display === '')) {
+        totalsContainer.style.display = 'block';
+        if (showTotalsBtn) {
+          showTotalsBtn.textContent = 'Hide Totals';
+          showTotalsBtn.classList.remove('bg-green-600');
+          showTotalsBtn.classList.add('bg-brown-600');
+          showTotalsBtn.style.backgroundColor = 'brown';
         }
+      }
     });
 
+    // showTotalsBtn toggling — when opening we recompute to ensure values are fresh
+    showTotalsBtn.addEventListener('click', () => {
+      if (totalsContainer.style.display === 'none' || totalsContainer.style.display === '') {
+        calculateTotals(); // ensure fresh
+        totalsContainer.style.display = 'block';
+        showTotalsBtn.textContent = 'Hide Totals';
+        showTotalsBtn.classList.remove('bg-green-600');
+        showTotalsBtn.classList.add('bg-brown-600');
+        showTotalsBtn.style.backgroundColor = 'brown';
+      } else {
+        totalsContainer.style.display = 'none';
+        showTotalsBtn.textContent = 'Show Totals';
+        showTotalsBtn.style.backgroundColor = '';
+        showTotalsBtn.classList.add('bg-green-600');
+      }
+    });
 
     // --- Export button (graceful client-side download) ---
     const exportBtn = document.getElementById('exportSalesDataBtn');
     if (exportBtn) {
       exportBtn.addEventListener('click', (e) => {
-        // If the server returns a file link directly, leave default behavior
-        // Otherwise use fetch to handle errors gracefully
         e.preventDefault();
         fetch(exportBtn.href)
           .then(r => {
@@ -506,7 +526,6 @@
         revenue[name] = (revenue[name] || 0) + price;
 
         if (date) {
-          // normalize date to yyyy-mm-dd
           const d = date.split('T')[0] || date;
           salesOverTime[d] = (salesOverTime[d] || 0) + price;
         }
@@ -567,6 +586,7 @@
 
   }); // DOMContentLoaded
 </script>
+
 
 
 
