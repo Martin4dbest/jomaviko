@@ -26,7 +26,7 @@
     <!-- Purchases card -->
     <section class="bg-white rounded-2xl shadow p-4 sm:p-6">
       <div class="flex items-center justify-between mb-4">
-        <h2 class="text-lg sm:text-xl font-semibold text-gray-800">📦 Ingredient Purchases (Stock-in)</h2>
+        <h2 class="text-lg sm:text-xl font-semibold text-gray-800">📦 Ingredient & Utilities Purchases (Stock-in)</h2>
         <div class="text-sm text-gray-500">Track quantity, unit and total cost</div>
       </div>
 
@@ -34,7 +34,7 @@
         <table class="w-full text-sm border-collapse">
           <thead>
             <tr class="bg-orange-600 text-white rounded-tl-md">
-              <th class="px-3 py-2 text-left">Ingredient</th>
+              <th class="px-3 py-2 text-left">Ingredient or Utilities</th>
               <th class="px-3 py-2 text-center">Qty</th>
               <th class="px-3 py-2 text-center">Unit</th>
               <th class="px-3 py-2 text-center">Total Cost (₦)</th>
@@ -101,7 +101,7 @@
     <!-- Usage per bread card -->
     <section class="bg-white rounded-2xl shadow p-4 sm:p-6">
       <div class="flex items-center justify-between mb-4">
-        <h2 class="text-lg sm:text-xl font-semibold text-gray-800">🍞 Ingredient Usage Per Bread Type (Stock-out)</h2>
+        <h2 class="text-lg sm:text-xl font-semibold text-gray-800">🍞 Ingredient or Utilities Usage Per Bread Type (Stock-out)</h2>
         <div class="text-sm text-gray-500">Pick purchased ingredients and enter qty used</div>
       </div>
 
@@ -131,7 +131,7 @@
                   <tr class="border-b hover:bg-gray-50">
                     <td class="px-2 py-2">
                       <select x-model.number="use.purchase_id" class="w-full sm:w-48 p-2 border rounded-lg" aria-label="Select ingredient">
-                        <option :value="null">-- Select Purchased Ingredient --</option>
+                        <option :value="null">-- Select Purchased Ingredient or Utilities --</option>
                         <template x-for="p in purchases" :key="p.id">
                           <option :value="p.id" :disabled="remainingFor(p.id) <= 0" x-text="(p.name || 'Untitled') + (remainingFor(p.id) <= 0 ? ' (Used up)' : '')"></option>
                         </template>
@@ -166,7 +166,7 @@
                 </template>
 
                 <tr x-show="bread.ingredients.length === 0">
-                  <td colspan="5" class="text-center py-4 text-gray-500">No ingredients yet for this bread. Add one to start.</td>
+                  <td colspan="5" class="text-center py-4 text-gray-500">No ingredients or Utilities yet for this bread. Add one to start.</td>
                 </tr>
               </tbody>
             </table>
