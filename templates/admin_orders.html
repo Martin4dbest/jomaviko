@@ -131,6 +131,23 @@
     <!-- Include Alpine.js for toggling -->
     <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
 
+        <!-- Manual Utilities Input -->
+    <div class="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+      <h4 class="text-md font-semibold mb-2">Enter Utilities Costs</h4>
+      <div class="flex flex-col sm:flex-row gap-3 items-end">
+        <div class="flex flex-col">
+          <label for="adminGasCost" class="text-sm text-gray-600">Gas Cost (₦)</label>
+          <input type="number" id="adminGasCost" placeholder="e.g., 500" class="p-2 border rounded-md w-full sm:w-40">
+        </div>
+        <div class="flex flex-col">
+          <label for="adminElectricityCost" class="text-sm text-gray-600">Electricity Cost (₦)</label>
+          <input type="number" id="adminElectricityCost" placeholder="e.g., 300" class="p-2 border rounded-md w-full sm:w-40">
+        </div>
+        <button id="calculateWithUtilities" class="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition">Calculate Profit</button>
+      </div>
+    </div>
+
+
     <!-- Financial Summary Card -->
     <div x-data="{ open: false }" 
         class="bg-gray-50 rounded-lg shadow p-0.5 mb-4 max-w-md mx-auto">
@@ -236,340 +253,320 @@
   </div>
 
   <!-- Bootstrap Bundle (kept for table styling) -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 
-  <!-- App Script: optimized client-side pagination + search + charts -->
-  <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      // --- Setup state ---
-      const tbody = document.getElementById('orderTableBody');
-      const rawRows = Array.from(tbody.querySelectorAll('tr'));
+<!-- App Script: optimized client-side pagination + search + charts -->
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // --- Setup state ---
+    const tbody = document.getElementById('orderTableBody');
+    const rawRows = Array.from(tbody.querySelectorAll('tr'));
 
-      // dataRows: only real data rows (exclude the "no-data" row if present)
-      const dataRows = rawRows.filter(r => r.classList.contains('data-row'));
+    // dataRows: only real data rows (exclude the "no-data" row if present)
+    const dataRows = rawRows.filter(r => r.classList.contains('data-row'));
 
-      // If there are no data rows, keep the no-data row visible and stop pagination
-      const noDataRow = rawRows.find(r => r.classList.contains('no-data')) || null;
+    // If there are no data rows, keep the no-data row visible and stop pagination
+    const noDataRow = rawRows.find(r => r.classList.contains('no-data')) || null;
 
-      let filteredRows = dataRows.slice();
-      let currentPage = 1;
-      const rowsPerPageSelect = document.getElementById('rowsPerPageSelect');
-      let rowsPerPage = parseInt(rowsPerPageSelect.value, 10) || 20;
-      const paginationContainer = document.getElementById('paginationContainer');
-      const pageSummary = document.getElementById('pageSummary');
+    let filteredRows = dataRows.slice();
+    let currentPage = 1;
+    const rowsPerPageSelect = document.getElementById('rowsPerPageSelect');
+    let rowsPerPage = parseInt(rowsPerPageSelect.value, 10) || 20;
+    const paginationContainer = document.getElementById('paginationContainer');
+    const pageSummary = document.getElementById('pageSummary');
 
-      // Clear existing tbody; we'll render slices
+    // Clear existing tbody; we'll render slices
+    tbody.innerHTML = '';
+    if (!dataRows.length && noDataRow) {
+      tbody.appendChild(noDataRow);
+    }
+
+    // --- Utility: render a page slice ---
+    function renderPage(page = 1) {
+      rowsPerPage = parseInt(rowsPerPageSelect.value, 10) || rowsPerPage;
+      const total = filteredRows.length;
+      const totalPages = Math.max(1, Math.ceil(total / rowsPerPage));
+      if (page < 1) page = 1;
+      if (page > totalPages) page = totalPages;
+      currentPage = page;
+
       tbody.innerHTML = '';
-      if (!dataRows.length && noDataRow) {
-        tbody.appendChild(noDataRow);
-      }
-
-      // --- Utility: render a page slice ---
-      function renderPage(page = 1) {
-        rowsPerPage = parseInt(rowsPerPageSelect.value, 10) || rowsPerPage;
-        const total = filteredRows.length;
-        const totalPages = Math.max(1, Math.ceil(total / rowsPerPage));
-        if (page < 1) page = 1;
-        if (page > totalPages) page = totalPages;
-        currentPage = page;
-
-        tbody.innerHTML = '';
-        if (total === 0) {
-          if (noDataRow) tbody.appendChild(noDataRow);
-          pageSummary.textContent = '0-0 of 0 items';
-          paginationContainer.innerHTML = '';
-          return;
-        }
-
-        const start = (page - 1) * rowsPerPage;
-        const end = Math.min(start + rowsPerPage, total);
-
-        const frag = document.createDocumentFragment();
-        for (let i = start; i < end; i++) frag.appendChild(filteredRows[i]);
-        tbody.appendChild(frag);
-
-        pageSummary.textContent = `${start + 1}-${end} of ${total} items`;
-        renderPaginationControls(totalPages);
-      }
-
-      // --- Pagination UI with window + ellipses ---
-      function renderPaginationControls(totalPages) {
+      if (total === 0) {
+        if (noDataRow) tbody.appendChild(noDataRow);
+        pageSummary.textContent = '0-0 of 0 items';
         paginationContainer.innerHTML = '';
-        const createBtn = (label, page, disabled = false, active = false) => {
-          const b = document.createElement('button');
-          b.type = 'button';
-          b.textContent = label;
-          b.className = `px-3 py-1 rounded m-1 ${active ? 'bg-gray-800 text-white' : 'bg-gray-200 hover:bg-gray-300'}`;
-          b.disabled = disabled;
-          if (!disabled) b.addEventListener('click', () => renderPage(page));
-          return b;
-        };
-
-        // Prev
-        paginationContainer.appendChild(createBtn('Prev', Math.max(1, currentPage - 1), currentPage === 1));
-
-        // Windowed pages
-        const win = 2;
-        const pages = [];
-        for (let i = 1; i <= totalPages; i++) {
-          if (i === 1 || i === totalPages || (i >= currentPage - win && i <= currentPage + win)) pages.push(i);
-        }
-        let last = 0;
-        pages.forEach(p => {
-          if (p - last > 1) {
-            const ell = document.createElement('span');
-            ell.textContent = '…';
-            ell.className = 'px-2 text-gray-500';
-            paginationContainer.appendChild(ell);
-          }
-          paginationContainer.appendChild(createBtn(String(p), p, false, p === currentPage));
-          last = p;
-        });
-
-        // Next
-        paginationContainer.appendChild(createBtn('Next', Math.min(totalPages, currentPage + 1), currentPage === totalPages));
+        return;
       }
 
-      // --- Search with debounce ---
-      const searchInput = document.getElementById('searchInput');
-      let searchTimer = null;
-      searchInput.addEventListener('input', () => {
-        clearTimeout(searchTimer);
-        searchTimer = setTimeout(() => {
-          const q = searchInput.value.toLowerCase().trim();
-          filteredRows = dataRows.filter(r => {
-            const txt = r.innerText.toLowerCase();
-            return txt.includes(q);
-          });
-          currentPage = 1;
-          renderPage(1);
-        }, 200);
+      const start = (page - 1) * rowsPerPage;
+      const end = Math.min(start + rowsPerPage, total);
+
+      const frag = document.createDocumentFragment();
+      for (let i = start; i < end; i++) frag.appendChild(filteredRows[i]);
+      tbody.appendChild(frag);
+
+      pageSummary.textContent = `${start + 1}-${end} of ${total} items`;
+      renderPaginationControls(totalPages);
+    }
+
+    // --- Pagination UI with window + ellipses ---
+    function renderPaginationControls(totalPages) {
+      paginationContainer.innerHTML = '';
+      const createBtn = (label, page, disabled = false, active = false) => {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.textContent = label;
+        b.className = `px-3 py-1 rounded m-1 ${active ? 'bg-gray-800 text-white' : 'bg-gray-200 hover:bg-gray-300'}`;
+        b.disabled = disabled;
+        if (!disabled) b.addEventListener('click', () => renderPage(page));
+        return b;
+      };
+
+      // Prev
+      paginationContainer.appendChild(createBtn('Prev', Math.max(1, currentPage - 1), currentPage === 1));
+
+      // Windowed pages
+      const win = 2;
+      const pages = [];
+      for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || (i >= currentPage - win && i <= currentPage + win)) pages.push(i);
+      }
+      let last = 0;
+      pages.forEach(p => {
+        if (p - last > 1) {
+          const ell = document.createElement('span');
+          ell.textContent = '…';
+          ell.className = 'px-2 text-gray-500';
+          paginationContainer.appendChild(ell);
+        }
+        paginationContainer.appendChild(createBtn(String(p), p, false, p === currentPage));
+        last = p;
       });
 
-      // Rows per page change
-      rowsPerPageSelect.addEventListener('change', () => {
-        rowsPerPage = parseInt(rowsPerPageSelect.value, 10) || rowsPerPage;
+      // Next
+      paginationContainer.appendChild(createBtn('Next', Math.min(totalPages, currentPage + 1), currentPage === totalPages));
+    }
+
+    // --- Search with debounce ---
+    const searchInput = document.getElementById('searchInput');
+    let searchTimer = null;
+    searchInput.addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        const q = searchInput.value.toLowerCase().trim();
+        filteredRows = dataRows.filter(r => {
+          const txt = r.innerText.toLowerCase();
+          return txt.includes(q);
+        });
         currentPage = 1;
         renderPage(1);
-      });
+      }, 200);
+    });
 
-      // Initial render
+    // Rows per page change
+    rowsPerPageSelect.addEventListener('change', () => {
+      rowsPerPage = parseInt(rowsPerPageSelect.value, 10) || rowsPerPage;
+      currentPage = 1;
       renderPage(1);
+    });
 
-      // --- Totals button ---
-      // --- Totals button ---
-      const showTotalsBtn = document.getElementById('showTotalsBtn');
-      const totalsContainer = document.getElementById('totalsContainer');
-      const totalQuantityEl = document.getElementById('totalQuantity');
-      const totalAmountEl = document.getElementById('totalAmount');
-      const totalPurchaseEl = document.getElementById('totalPurchase');
-      const totalUsageEl = document.getElementById('totalUsageCost'); 
-      const totalProfitEl = document.getElementById('totalProfit');   
+    // Initial render
+    renderPage(1);
 
-      function calculateTotals() {
-          let totalQuantity = 0;
-          let totalAmount = 0;
-          let totalPurchase = 0;
-          let totalUsage = 0;
-          let totalProfitLoss = 0;
+    // --- Totals button ---
+    // --- Totals button ---
+    const showTotalsBtn = document.getElementById('showTotalsBtn');
+    const totalsContainer = document.getElementById('totalsContainer');
+    const totalQuantityEl = document.getElementById('totalQuantity');
+    const totalAmountEl = document.getElementById('totalAmount');
+    const totalPurchaseEl = document.getElementById('totalPurchase');
+    const totalUsageEl = document.getElementById('totalUsageCost'); 
+    const totalProfitEl = document.getElementById('totalProfit');   
 
-          // Only visible rows on the current page
-          const visibleRows = Array.from(tbody.querySelectorAll('tr.data-row'));
+    // === INSERTED: calculateWithUtilities listener (from your snippet) ===
+    document.getElementById('calculateWithUtilities')?.addEventListener('click', () => {
+        const gasCost = parseFloat(document.getElementById('adminGasCost').value) || 0;
+        const electricityCost = parseFloat(document.getElementById('adminElectricityCost').value) || 0;
 
-          visibleRows.forEach(row => {
-              const cells = row.children;
+        const totalUsageEl = document.getElementById('totalUsageCost');
+        const totalProfitEl = document.getElementById('totalProfit');
+        const totalAmountEl = document.getElementById('totalAmount');
+        const totalPurchaseEl = document.getElementById('totalPurchase');
 
-              const qty = parseInt(cells[3].textContent.trim(), 10) || 0;
-              const amt = parseFloat(cells[5].textContent.trim()) || 0;
-              const purchase = parseFloat(cells[5].dataset.purchaseCost) || 0;
-              const usage = parseFloat(cells[5].dataset.usageCost) || 0;
-              const profitLoss = amt - (purchase + usage);
+        // Convert displayed totals to numbers
+        const totalSales = parseFloat(totalAmountEl.textContent) || 0;
+        const totalPurchase = parseFloat(totalPurchaseEl.textContent) || 0;
+
+        // Total usage includes current usage plus manual input
+        const totalUsage = gasCost + electricityCost;
+        totalUsageEl.textContent = totalUsage.toFixed(2);
+
+        // Profit/Loss = Sales - (Purchase + Usage)
+        const profitLoss = totalSales - (totalPurchase + totalUsage);
+        totalProfitEl.textContent = profitLoss.toFixed(2);
+    });
+    // === END INSERT ===
+
+    function calculateTotals() {
+        let totalQuantity = 0;
+        let totalAmount = 0;
+        let totalPurchase = 0;
+        let totalUsage = 0;
+        let totalProfitLoss = 0;
+
+        // Only visible rows on the current page
+        const visibleRows = Array.from(tbody.querySelectorAll('tr.data-row'));
+
+        visibleRows.forEach(row => {
+            const cells = row.children;
+
+            const qty = parseInt(cells[3].textContent.trim(), 10) || 0;
+            const amt = parseFloat(cells[5].textContent.trim()) || 0;
+            const purchase = parseFloat(cells[5].dataset.purchaseCost) || 0;
+            const usage = parseFloat(cells[5].dataset.usageCost) || 0;
+            const profitLoss = amt - (purchase + usage);
 
 
 
-              totalQuantity += qty;
-              totalAmount += amt;
-              totalPurchase += purchase;
-              totalUsage += usage;
-              totalProfitLoss += profitLoss;
-          });
+            totalQuantity += qty;
+            totalAmount += amt;
+            totalPurchase += purchase;
+            totalUsage += usage;
+            totalProfitLoss += profitLoss;
+        });
 
-          totalQuantityEl.textContent = totalQuantity;
-          totalAmountEl.textContent = totalAmount.toFixed(2);
-          totalPurchaseEl.textContent = totalPurchase.toFixed(2);
-          totalUsageEl.textContent = totalUsage.toFixed(2);
-          totalProfitEl.textContent = totalProfitLoss.toFixed(2);
-      }
+        totalQuantityEl.textContent = totalQuantity;
+        totalAmountEl.textContent = totalAmount.toFixed(2);
+        totalPurchaseEl.textContent = totalPurchase.toFixed(2);
+        totalUsageEl.textContent = totalUsage.toFixed(2);
+        totalProfitEl.textContent = totalProfitLoss.toFixed(2);
+    }
 
-      showTotalsBtn.addEventListener('click', () => {
-          if (totalsContainer.style.display === 'none' || totalsContainer.style.display === '') {
-              calculateTotals();
-              totalsContainer.style.display = 'block';
-              showTotalsBtn.textContent = 'Hide Totals';
-              showTotalsBtn.classList.remove('bg-green-600');
-              showTotalsBtn.classList.add('bg-brown-600');
-              showTotalsBtn.style.backgroundColor = 'brown';
-          } else {
-              totalsContainer.style.display = 'none';
-              showTotalsBtn.textContent = 'Show Totals';
-              showTotalsBtn.style.backgroundColor = '';
-              showTotalsBtn.classList.add('bg-green-600');
-          }
+    showTotalsBtn.addEventListener('click', () => {
+        if (totalsContainer.style.display === 'none' || totalsContainer.style.display === '') {
+            calculateTotals();
+            totalsContainer.style.display = 'block';
+            showTotalsBtn.textContent = 'Hide Totals';
+            showTotalsBtn.classList.remove('bg-green-600');
+            showTotalsBtn.classList.add('bg-brown-600');
+            showTotalsBtn.style.backgroundColor = 'brown';
+        } else {
+            totalsContainer.style.display = 'none';
+            showTotalsBtn.textContent = 'Show Totals';
+            showTotalsBtn.style.backgroundColor = '';
+            showTotalsBtn.classList.add('bg-green-600');
+        }
+    });
+
+
+    // --- Export button (graceful client-side download) ---
+    const exportBtn = document.getElementById('exportSalesDataBtn');
+    if (exportBtn) {
+      exportBtn.addEventListener('click', (e) => {
+        // If the server returns a file link directly, leave default behavior
+        // Otherwise use fetch to handle errors gracefully
+        e.preventDefault();
+        fetch(exportBtn.href)
+          .then(r => {
+            if (!r.ok) {
+              if (r.status === 404) alert('🚫 No sales history available for export.');
+              else alert('⚠️ An error occurred while exporting sales history.');
+              throw new Error('Export failed');
+            }
+            return r.blob();
+          })
+          .then(blob => {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'sales_data.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+          })
+          .catch(err => console.error('Export error', err));
+      });
+    }
+
+    // --- Charts: use server-provided sales_data JSON if available ---
+    try {
+      const salesData = JSON.parse(`{{ sales_data | tojson | safe }}`) || [];
+      const products = {};
+      const revenue = {};
+      const salesOverTime = {};
+
+      salesData.forEach(item => {
+        const name = item.product_name;
+        const quantity = parseInt(item.quantity_sold) || 0;
+        const price = parseFloat(item.total_price) || 0;
+        const date = item.sale_date || null;
+
+        products[name] = (products[name] || 0) + quantity;
+        revenue[name] = (revenue[name] || 0) + price;
+
+        if (date) {
+          // normalize date to yyyy-mm-dd
+          const d = date.split('T')[0] || date;
+          salesOverTime[d] = (salesOverTime[d] || 0) + price;
+        }
       });
 
+      const labels = Object.keys(products);
+      const quantities = Object.values(products);
+      const revenues = Object.values(revenue);
 
-      // --- Export button (graceful client-side download) ---
-      const exportBtn = document.getElementById('exportSalesDataBtn');
-      if (exportBtn) {
-        exportBtn.addEventListener('click', (e) => {
-          // If the server returns a file link directly, leave default behavior
-          // Otherwise use fetch to handle errors gracefully
-          e.preventDefault();
-          fetch(exportBtn.href)
-            .then(r => {
-              if (!r.ok) {
-                if (r.status === 404) alert('🚫 No sales history available for export.');
-                else alert('⚠️ An error occurred while exporting sales history.');
-                throw new Error('Export failed');
-              }
-              return r.blob();
-            })
-            .then(blob => {
-              const url = window.URL.createObjectURL(blob);
-              const a = document.createElement('a');
-              a.href = url;
-              a.download = 'sales_data.xlsx';
-              document.body.appendChild(a);
-              a.click();
-              a.remove();
-            })
-            .catch(err => console.error('Export error', err));
+      // Pie chart
+      const pieCtx = document.getElementById('pieChart')?.getContext('2d');
+      if (pieCtx) {
+        new Chart(pieCtx, {
+          type: 'pie',
+          data: {
+            labels: labels,
+            datasets: [{ data: quantities, backgroundColor: ['#34D399', '#60A5FA', '#FBBF24', '#F87171', '#A78BFA', '#F472B6', '#4ADE80'] }]
+          },
+          options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
         });
       }
 
-      // --- Charts: use server-provided sales_data JSON if available ---
-      try {
-        const salesData = JSON.parse(`{{ sales_data | tojson | safe }}`) || [];
-        const products = {};
-        const revenue = {};
-        const salesOverTime = {};
-
-        salesData.forEach(item => {
-          const name = item.product_name;
-          const quantity = parseInt(item.quantity_sold) || 0;
-          const price = parseFloat(item.total_price) || 0;
-          const date = item.sale_date || null;
-
-          products[name] = (products[name] || 0) + quantity;
-          revenue[name] = (revenue[name] || 0) + price;
-
-          if (date) {
-            // normalize date to yyyy-mm-dd
-            const d = date.split('T')[0] || date;
-            salesOverTime[d] = (salesOverTime[d] || 0) + price;
-          }
+      // Bar chart
+      const barCtx = document.getElementById('barChart')?.getContext('2d');
+      if (barCtx) {
+        new Chart(barCtx, {
+          type: 'bar',
+          data: { labels: labels, datasets: [{ label: 'Revenue ($)', data: revenues, backgroundColor: '#6366F1' }] },
+          options: { responsive: true, scales: { y: { beginAtZero: true } } }
         });
-
-        const labels = Object.keys(products);
-        const quantities = Object.values(products);
-        const revenues = Object.values(revenue);
-
-        // Pie chart
-        const pieCtx = document.getElementById('pieChart')?.getContext('2d');
-        if (pieCtx) {
-          new Chart(pieCtx, {
-            type: 'pie',
-            data: {
-              labels: labels,
-              datasets: [{ data: quantities, backgroundColor: ['#34D399', '#60A5FA', '#FBBF24', '#F87171', '#A78BFA', '#F472B6', '#4ADE80'] }]
-            },
-            options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-          });
-        }
-
-        // Bar chart
-        const barCtx = document.getElementById('barChart')?.getContext('2d');
-        if (barCtx) {
-          new Chart(barCtx, {
-            type: 'bar',
-            data: { labels: labels, datasets: [{ label: 'Revenue ($)', data: revenues, backgroundColor: '#6366F1' }] },
-            options: { responsive: true, scales: { y: { beginAtZero: true } } }
-          });
-        }
-
-        // Populate Top Products list only if server didn't already render it
-        const topProductsList = document.getElementById('topProductsList');
-        if (topProductsList && topProductsList.children.length === 0) {
-          const top = Object.entries(products).sort((a,b)=>b[1]-a[1]).slice(0,5);
-          top.forEach(([p,qty]) => {
-            const li = document.createElement('li');
-            li.textContent = `${p} - ${qty} sold`;
-            topProductsList.appendChild(li);
-          });
-        }
-
-        // Update best seller placeholders if server didn't
-        const bestSellerNameEl = document.getElementById('bestSellerName');
-        const bestSellerSalesEl = document.getElementById('bestSellerSales');
-        if (bestSellerNameEl && (!bestSellerNameEl.textContent || bestSellerNameEl.textContent.trim() === '')) {
-          const sorted = Object.entries(products).sort((a,b)=>b[1]-a[1]);
-          if (sorted.length) {
-            bestSellerNameEl.textContent = sorted[0][0];
-            bestSellerSalesEl.textContent = sorted[0][1];
-          }
-        }
-
-      } catch (err) {
-        console.warn('Charts: could not parse sales_data or no data provided', err);
       }
 
-    }); // DOMContentLoaded
-  </script>
+      // Populate Top Products list only if server didn't already render it
+      const topProductsList = document.getElementById('topProductsList');
+      if (topProductsList && topProductsList.children.length === 0) {
+        const top = Object.entries(products).sort((a,b)=>b[1]-a[1]).slice(0,5);
+        top.forEach(([p,qty]) => {
+          const li = document.createElement('li');
+          li.textContent = `${p} - ${qty} sold`;
+          topProductsList.appendChild(li);
+        });
+      }
 
+      // Update best seller placeholders if server didn't
+      const bestSellerNameEl = document.getElementById('bestSellerName');
+      const bestSellerSalesEl = document.getElementById('bestSellerSales');
+      if (bestSellerNameEl && (!bestSellerNameEl.textContent || bestSellerNameEl.textContent.trim() === '')) {
+        const sorted = Object.entries(products).sort((a,b)=>b[1]-a[1]);
+        if (sorted.length) {
+          bestSellerNameEl.textContent = sorted[0][0];
+          bestSellerSalesEl.textContent = sorted[0][1];
+        }
+      }
 
-  <script>
-      document.addEventListener('DOMContentLoaded', () => {
-          const showTotalsBtn = document.getElementById('showTotalsBtn');
-          const totalQuantityEl = document.getElementById('totalQuantity');
-          const totalAmountEl = document.getElementById('totalAmount');
-          const totalPurchaseEl = document.getElementById('totalPurchase');
-          const totalUsageEl = document.getElementById('totalUsage');
-          const totalProfitEl = document.getElementById('totalProfit');
+    } catch (err) {
+      console.warn('Charts: could not parse sales_data or no data provided', err);
+    }
 
-          showTotalsBtn.addEventListener('click', () => {
-              let totalQty = 0;
-              let totalAmt = 0;
-              let totalPurchase = 0;
-              let totalUsage = 0;
-              let totalProfit = 0;
+  }); // DOMContentLoaded
+</script>
 
-              // Loop through each row of your sales table
-              document.querySelectorAll('#orderTableBody tr').forEach(row => {
-                  const qty = parseFloat(row.querySelector('.orderQty').textContent) || 0;
-                  const amt = parseFloat(row.querySelector('.orderAmount').textContent.replace(/,/g,'')) || 0;
-
-                  // Fetch purchase & usage cost from data attributes (must be set in backend)
-                  const purchaseCost = parseFloat(row.dataset.purchaseCost) || 0;
-                  const usageCost = parseFloat(row.dataset.usageCost) || 0;
-
-                  const profit = amt - (purchaseCost + usageCost);
-
-                  totalQty += qty;
-                  totalAmt += amt;
-                  totalPurchase += purchaseCost;
-                  totalUsage += usageCost;
-                  totalProfit += profit;
-              });
-
-              // Display totals
-              totalQuantityEl.textContent = totalQty;
-              totalAmountEl.textContent = totalAmt.toFixed(2);
-              totalPurchaseEl.textContent = totalPurchase.toFixed(2);
-              totalUsageEl.textContent = totalUsage.toFixed(2);
-              totalProfitEl.textContent = totalProfit.toFixed(2);
-          });
-      });
-      </script>
 
 
 </body>
